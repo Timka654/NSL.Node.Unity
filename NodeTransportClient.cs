@@ -2,6 +2,7 @@ using NSL.BuilderExtensions.SocketCore;
 using NSL.BuilderExtensions.SocketCore.Unity;
 using NSL.BuilderExtensions.WebSocketsClient;
 using NSL.Node.BridgeServer.Shared.Enums;
+using NSL.Node.RoomServer.Shared.Client.Core.Enums;
 using NSL.SocketClient;
 using NSL.SocketCore.Extensions.Buffer;
 using NSL.SocketCore.Utils.Buffer;
@@ -49,7 +50,7 @@ public class NodeTransportClient
 
     public async Task<bool> SendReady(int totalCount, IEnumerable<Guid> readyNodes)
     {
-        var p = WaitablePacketBuffer.Create(NodeTransportPacketEnum.ReadyNode);
+        var p = WaitablePacketBuffer.Create(RoomPacketEnum.ReadyNode);
 
         p.WriteInt32(totalCount);
         p.WriteCollection(readyNodes, i => p.WriteGuid(i));
@@ -116,11 +117,11 @@ public class NodeTransportClient
                     });
 
                     builder.AddConnectHandle(client => client.Url = uri);
-                    builder.AddPacketHandle(NodeTransportPacketEnum.SignSessionResult, OnSignSessionReceive);
-                    builder.AddPacketHandle(NodeTransportPacketEnum.ChangeNodeList, OnChangeNodeListReceive);
-                    builder.AddPacketHandle(NodeTransportPacketEnum.Transport, OnTransportReceive);
-                    builder.AddReceivePacketHandle(NodeTransportPacketEnum.ReadyNodeResult, c => c.PacketWaitBuffer);
-                    builder.AddPacketHandle(NodeTransportPacketEnum.ReadyRoom, OnRoomReadyReceive);
+                    builder.AddPacketHandle(RoomPacketEnum.SignSessionResult, OnSignSessionReceive);
+                    builder.AddPacketHandle(RoomPacketEnum.ChangeNodeList, OnChangeNodeListReceive);
+                    builder.AddPacketHandle(RoomPacketEnum.Transport, OnTransportReceive);
+                    builder.AddReceivePacketHandle(RoomPacketEnum.ReadyNodeResult, c => c.PacketWaitBuffer);
+                    builder.AddPacketHandle(RoomPacketEnum.ReadyRoom, OnRoomReadyReceive);
                 })
                 .WithUrl(uri)
                 .Build());
@@ -142,7 +143,7 @@ public class NodeTransportClient
 
     private bool trySign(Guid nodeIdentity, string sessionIdentity, string endPoint)
     {
-        var packet = OutputPacketBuffer.Create(NodeTransportPacketEnum.SignSession);
+        var packet = OutputPacketBuffer.Create(RoomPacketEnum.SignSession);
 
         packet.WriteString16(sessionIdentity);
         packet.WriteGuid(nodeIdentity);
