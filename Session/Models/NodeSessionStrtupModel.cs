@@ -2,8 +2,6 @@ using NSL.SocketCore.Utils.Buffer;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using UnityEngine;
-using static NodeLobbyNetwork;
 
 public class NodeSessionStartupModel
 {
