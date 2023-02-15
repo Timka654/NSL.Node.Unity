@@ -10,7 +10,7 @@ using NSL.Utils;
 using System;
 using System.Collections.Concurrent;
 using UnityEngine;
-using static NodeTransportClient;
+using static NodeRoomClient;
 
 public enum NodeClientState
 {
@@ -29,7 +29,7 @@ public class NodeClient : INetworkClient, IPlayerNetwork
 
     public bool IsLocalNode => NodeNetwork.LocalNodeId == PlayerId;
 
-    public NodeTransportClient Proxy { get; }
+    public NodeRoomClient Proxy { get; }
 
     public string EndPoint => connectionInfo.EndPoint;
 
@@ -39,7 +39,7 @@ public class NodeClient : INetworkClient, IPlayerNetwork
 
     public PlayerInfo PlayerInfo { get; private set; }
 
-    public NodeClient(NodeConnectionInfo connectionInfo, NodeNetwork nodeNetwork, NodeTransportClient proxy)
+    public NodeClient(NodeConnectionInfoModel connectionInfo, NodeNetwork nodeNetwork, NodeRoomClient proxy)
     {
         this.connectionInfo = connectionInfo;
 
@@ -65,7 +65,7 @@ public class NodeClient : INetworkClient, IPlayerNetwork
         handle(PlayerInfo, buffer);
     }
 
-    public bool TryConnect(NodeConnectionInfo connectionInfo)
+    public bool TryConnect(NodeConnectionInfoModel connectionInfo)
     {
         if (State != NodeClientState.None && EndPoint.Equals(connectionInfo.EndPoint))
             return true;
@@ -140,7 +140,7 @@ public class NodeClient : INetworkClient, IPlayerNetwork
             networkClient.Send(packet, false);
 
         if (NodeNetwork.TransportMode.HasFlag(NodeTransportMode.ProxyOnly))
-            Proxy.Transport(packet);
+            Proxy.Broadcast(packet);
 
         if (disposeOnSend)
             packet.Dispose();
@@ -196,7 +196,7 @@ public class NodeClient : INetworkClient, IPlayerNetwork
     private UDPNetworkClient<NodeNetworkClient> udpNetwork;
 
     private INetworkNode networkClient;
-    private NodeConnectionInfo connectionInfo;
+    private NodeConnectionInfoModel connectionInfo;
 }
 
 public delegate void NodeClientStateChangeDelegate(NodeClientState newState, NodeClientState oldState);

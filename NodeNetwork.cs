@@ -22,9 +22,9 @@ public class NodeNetwork : MonoBehaviour, IRoomInfo
 {
     public NodeBridgeClient bridgeClient;
 
-    public NodeTransportClient transportClient;
+    public NodeRoomClient transportClient;
 
-    private NodeLobbyNetwork.RoomStartInfo roomStartInfo;
+    private NodeLobbyClient.RoomStartInfo roomStartInfo;
 
     private UDPServer<UDPNodeServerNetworkClient> endPoint;
 
@@ -72,13 +72,13 @@ public class NodeNetwork : MonoBehaviour, IRoomInfo
     /// </summary>
     public Guid LocalNodeId { get; private set; } = Guid.Empty;
 
-    internal async void Initialize(NodeLobbyNetwork.RoomStartInfo startupInfo, CancellationToken cancellationToken = default)
+    internal async void Initialize(NodeLobbyClient.RoomStartInfo startupInfo, CancellationToken cancellationToken = default)
         => await InitializeAsync(startupInfo, cancellationToken);
 
     public GameInfo GameInfo { get; private set; }
 
 
-    internal async Task InitializeAsync(NodeLobbyNetwork.RoomStartInfo startupInfo, CancellationToken cancellationToken = default)
+    internal async Task InitializeAsync(NodeLobbyClient.RoomStartInfo startupInfo, CancellationToken cancellationToken = default)
     {
         GameInfo = new GameInfo(this);
 
@@ -203,20 +203,20 @@ public class NodeNetwork : MonoBehaviour, IRoomInfo
 
         var point = connectionPoints.First();
 
-        transportClient = new NodeTransportClient(point.ConnectionUrl);
+        transportClient = new NodeRoomClient(point.ConnectionUrl);
 
         transportClient.OnSignOnServerResult = (result, instance, url) =>
         {
             if (result)
                 return;
 
-            Debug.LogError($"Cannot sign on {nameof(NodeTransportClient)}");
+            Debug.LogError($"Cannot sign on {nameof(NodeRoomClient)} - {url}");
         };
 
-        transportClient.OnRoomAllNodesReady += (createTime, srv_offs) =>
+        transportClient.OnRoomReady += (createTime, srv_offs) =>
         {
 #if DEBUG
-            Debug.Log($"{nameof(transportClient.OnRoomAllNodesReady)} - {createTime} - {srv_offs}");
+            Debug.Log($"{nameof(transportClient.OnRoomReady)} - {createTime} - {srv_offs}");
 #endif
         };
 
@@ -247,8 +247,13 @@ public class NodeNetwork : MonoBehaviour, IRoomInfo
         if (cancellationToken.IsCancellationRequested)
             throw new TaskCanceledException();
 
-        if (transportClient.Connect(LocalNodeId = point.Id, roomStartInfo.Token, endPointConnectionUrl) == default)
+        if (transportClient.Connect(LocalNodeId = point.Id, roomStartInfo.Token, endPointConnectionUrl, Log) == default)
             throw new Exception($"WaitAndRun : Can't find working transport servers");
+    }
+
+    protected virtual void Log(string message)
+    {
+        Debug.Log(message);
     }
 
     private async Task WaitNodeConnection(CancellationToken cancellationToken = default)
@@ -349,7 +354,7 @@ public class NodeNetwork : MonoBehaviour, IRoomInfo
 
     public void SendToGameServer(OutputPacketBuffer packet)
     {
-        transportClient.Transport(packet);
+        transportClient.Broadcast(packet);
     }
 
     #endregion
