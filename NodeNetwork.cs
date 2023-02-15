@@ -409,23 +409,6 @@ public class NodeNetwork : MonoBehaviour, IRoomInfo
     }
 
     #endregion
-
-#if DEBUG
-
-    private void Update()
-    {
-        if (Ready)
-        {
-            var delta = Time.deltaTime;
-
-            Broadcast(p =>
-            {
-                p.WriteFloat(delta);
-            }, 11);
-        }
-    }
-
-#endif
 }
 
 
