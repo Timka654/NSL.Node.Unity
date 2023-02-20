@@ -2,29 +2,33 @@ using NSL.BuilderExtensions.SocketCore;
 using NSL.BuilderExtensions.SocketCore.Unity;
 using NSL.BuilderExtensions.WebSocketsClient;
 using NSL.Node.BridgeServer.Shared.Enums;
-using NSL.SocketClient;
 using NSL.SocketCore.Utils.Buffer;
+using NSL.SocketCore.Utils.Logger.Enums;
 using NSL.WebSockets.Client;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using UnityEngine;
+using UnityEditor.Experimental.GraphView;
 
-public class NodeBridgeClient : IDisposable
+public partial class NodeBridgeClient : IDisposable
 {
-    public delegate void OnReceiveSignSessionResultDelegate(bool result, NodeBridgeClient instance, Uri from, IEnumerable<TransportSessionInfo> servers);
+    public delegate void OnReceiveSignSessionResultDelegate(bool result, NodeBridgeClient instance, Uri from, IEnumerable<TransportSessionInfoModel> servers);
 
     private readonly IEnumerable<Uri> wssUrls;
 
+    private readonly NodeNetwork node;
+    private readonly NodeLogDelegate logHandle;
+
     private Dictionary<Uri, WSNetworkClient<BridgeNetworkClient, WSClientOptions<BridgeNetworkClient>>> connections = new Dictionary<Uri, WSNetworkClient<BridgeNetworkClient, WSClientOptions<BridgeNetworkClient>>>();
 
-    public NodeBridgeClient(IEnumerable<string> wssUrls) : this(wssUrls.Select(x => new Uri(x))) { }
+    public NodeBridgeClient(NodeNetwork node, NodeLogDelegate logHandle, IEnumerable<string> wssUrls) : this(node, logHandle, wssUrls.Select(x => new Uri(x))) { }
 
-    public NodeBridgeClient(IEnumerable<Uri> wssUrls) { this.wssUrls = wssUrls; }
-
-    public NodeBridgeClient(string wssUrl) : this(Enumerable.Repeat(wssUrl, 1).ToArray()) { }
-
-    public NodeBridgeClient(Uri wssUrl) : this(Enumerable.Repeat(wssUrl, 1).ToArray()) { }
+    public NodeBridgeClient(NodeNetwork node, NodeLogDelegate logHandle, IEnumerable<Uri> wssUrls)
+    {
+        this.node = node;
+        this.logHandle = logHandle;
+        this.wssUrls = wssUrls;
+    }
 
     public int Connect(string serverIdentity, Guid roomId, string sessionIdentity, int maxCount = 1, int connectionTimeout = 2000)
     {
@@ -56,15 +60,28 @@ public class NodeBridgeClient : IDisposable
                 .WithOptions<WSClientOptions<BridgeNetworkClient>>()
                 .WithCode(builder =>
                 {
-                    builder.AddSendHandleForUnity((c, pid, len, st) =>
-                    {
-                        Debug.Log($"Send {pid} to bridge client");
-                    });
 
-                    builder.AddReceiveHandleForUnity((c, pid, len) =>
+                    if (node.DebugPacketIO)
                     {
-                        Debug.Log($"Receive {pid} from bridge client");
-                    });
+                        builder.AddSendHandle((c, pid, len, st) =>
+                        {
+                            logHandle?.Invoke(LoggerLevel.Info, $"[Bridge Server] Send {pid}");
+                        });
+
+                        builder.AddReceiveHandle((c, pid, len) =>
+                        {
+                            logHandle?.Invoke(LoggerLevel.Info, $"[Bridge Server] Receive {pid}");
+                        });
+                    }
+                    //builder.AddSendHandleForUnity((c, pid, len, st) =>
+                    //{
+                    //    Debug.Log($"Send {pid} to bridge client");
+                    //}); //todo
+
+                    //builder.AddReceiveHandleForUnity((c, pid, len) =>
+                    //{
+                    //    Debug.Log($"Receive {pid} from bridge client");
+                    //}); // todo
 
                     builder.AddConnectHandle(client => client.Url = uri);
                     builder.AddPacketHandle(NodeBridgeClientPacketEnum.SignSessionResultPID, OnSignSessionReceive);
@@ -119,7 +136,7 @@ public class NodeBridgeClient : IDisposable
     {
         var result = data.ReadBool();
 
-        var sessions = result ? data.ReadCollection(() => new TransportSessionInfo(data.ReadString16(), data.ReadGuid())) : null;
+        var sessions = result ? data.ReadCollection(() => TransportSessionInfoModel.Read(data)) : null;
 
         OnAvailableBridgeServersResult(result, this, client.Url, sessions);
     }
@@ -136,36 +153,4 @@ public class NodeBridgeClient : IDisposable
     }
 
     public OnReceiveSignSessionResultDelegate OnAvailableBridgeServersResult = (result, instance, from, servers) => { };
-
-    public class TransportSessionInfo
-    {
-        public TransportSessionInfo(string connectionUrl, Guid id)
-        {
-            ConnectionUrl = connectionUrl;
-            Id = id;
-        }
-
-        public string ConnectionUrl { get; }
-
-        public Guid Id { get; }
-    }
-
-    private class BridgeNetworkClient : BaseSocketNetworkClient
-    {
-        public Uri Url { get; set; }
-
-        //public PacketWaitBuffer PacketWaitBuffer { get; }
-
-        //public BridgeNetworkClient()
-        //{
-        //    PacketWaitBuffer = new PacketWaitBuffer(this);
-        //}
-
-        //public override void Dispose()
-        //{
-        //    PacketWaitBuffer.Dispose();
-
-        //    base.Dispose();
-        //}
-    }
 }

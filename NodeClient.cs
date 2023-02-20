@@ -9,8 +9,6 @@ using NSL.UDP.Client;
 using NSL.Utils;
 using System;
 using System.Collections.Concurrent;
-using UnityEngine;
-using static NodeRoomClient;
 
 public enum NodeClientState
 {
@@ -59,8 +57,8 @@ public class NodeClient : INetworkClient, IPlayerNetwork
 
         var handle = NodeNetwork.GetHandle(code);
 
-        if (handle == null)
-            Debug.LogError($"{nameof(NodeClient)} Cannot find handle for code {code}");
+        //if (handle == null)
+        //    Debug.LogError($"{nameof(NodeClient)} Cannot find handle for code {code}"); // todo
 
         handle(PlayerInfo, buffer);
     }
@@ -140,7 +138,7 @@ public class NodeClient : INetworkClient, IPlayerNetwork
             networkClient.Send(packet, false);
 
         if (NodeNetwork.TransportMode.HasFlag(NodeTransportMode.ProxyOnly))
-            Proxy.Broadcast(packet);
+            Proxy.SendToServers(packet);
 
         if (disposeOnSend)
             packet.Dispose();

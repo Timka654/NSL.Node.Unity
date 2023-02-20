@@ -16,52 +16,52 @@ public class NodeSession<TNodeOptions> : IDisposable
 
     private NodeBridgeClient bridgeClient;
 
-    List<NodeBridgeClient.TransportSessionInfo> connectionPoints = new List<NodeBridgeClient.TransportSessionInfo>();
+    List<TransportSessionInfoModel> connectionPoints = new List<TransportSessionInfoModel>();
 
     public NodeSession(TNodeOptions options)
     {
         Options = options;
     }
 
-    public async Task LoadProxyEndPoints(CancellationToken cancellationToken)
-    {
-        try
-        {
-            connectionPoints.Clear();
+    //public async Task LoadProxyEndPoints(CancellationToken cancellationToken)
+    //{
+    //    try
+    //    {
+    //        connectionPoints.Clear();
 
-            bridgeClient = new NodeBridgeClient(Options.StartupInfo.ConnectionEndPoints);
+    //        bridgeClient = new NodeBridgeClient(Options.StartupInfo.ConnectionEndPoints);
 
             
-            using SemaphoreSlim locker = new SemaphoreSlim(0,Options.StartupInfo.ConnectionEndPoints.Count);
+    //        using SemaphoreSlim locker = new SemaphoreSlim(0,Options.StartupInfo.ConnectionEndPoints.Count);
 
-            bridgeClient.OnAvailableBridgeServersResult = (result, instance, from, servers) =>
-            {
-                if (result)
-                    connectionPoints.AddRange(servers);
+    //        bridgeClient.OnAvailableBridgeServersResult = (result, instance, from, servers) =>
+    //        {
+    //            if (result)
+    //                connectionPoints.AddRange(servers);
 
-                locker.Release(1);
-            };
+    //            locker.Release(1);
+    //        };
 
-            int serverCount = bridgeClient.Connect(
-                Options.StartupInfo.ServerIdentity,
-                Options.StartupInfo.RoomId,
-                Options.StartupInfo.Token,
-                Options.BridgeMaxServerCount,
-                (int)Options.BridgeConnectionTimeOut.TotalMilliseconds);
+    //        int serverCount = bridgeClient.Connect(
+    //            Options.StartupInfo.ServerIdentity,
+    //            Options.StartupInfo.RoomId,
+    //            Options.StartupInfo.Token,
+    //            Options.BridgeMaxServerCount,
+    //            (int)Options.BridgeConnectionTimeOut.TotalMilliseconds);
 
-            if (serverCount == default)
-                throw new Exception("Must have any connection points");
+    //        if (serverCount == default)
+    //            throw new Exception("Must have any connection points");
 
-            await locker.WaitAsync(10_000, cancellationToken);
+    //        await locker.WaitAsync(10_000, cancellationToken);
 
-            if (!connectionPoints.Any())
-                throw new Exception($"WaitAndRun : Can't find working servers");
+    //        if (!connectionPoints.Any())
+    //            throw new Exception($"WaitAndRun : Can't find working servers");
 
-        }
-        catch (TaskCanceledException)
-        {
-        }
-    }
+    //    }
+    //    catch (TaskCanceledException)
+    //    {
+    //    }
+    //}
 
     public void Dispose()
     {

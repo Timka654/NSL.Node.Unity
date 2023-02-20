@@ -1,13 +1,17 @@
+using NSL.BuilderExtensions.SocketCore;
 using NSL.BuilderExtensions.SocketCore.Unity;
 using NSL.BuilderExtensions.UDPServer;
+using NSL.Node.BridgeServer.Shared.Enums;
 using NSL.Node.RoomServer.Shared.Client.Core;
 using NSL.Node.RoomServer.Shared.Client.Core.Enums;
 using NSL.SocketCore.Utils.Buffer;
+using NSL.SocketCore.Utils.Logger.Enums;
 using NSL.SocketServer.Utils;
 using NSL.UDP.Client;
 using NSL.UDP.Client.Info;
 using NSL.UDP.Client.Interface;
 using NSL.Utils;
+using NSL.Utils.Unity;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -16,15 +20,14 @@ using System.Net;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
-using UnityEngine;
 
-public class NodeNetwork : MonoBehaviour, IRoomInfo
+public class NodeNetwork : UnityEngine.MonoBehaviour, IRoomInfo
 {
     public NodeBridgeClient bridgeClient;
 
     public NodeRoomClient transportClient;
 
-    private NodeLobbyClient.RoomStartInfo roomStartInfo;
+    private RoomStartInfo roomStartInfo;
 
     private UDPServer<UDPNodeServerNetworkClient> endPoint;
 
@@ -45,7 +48,7 @@ public class NodeNetwork : MonoBehaviour, IRoomInfo
     /// Can set how transport all data - P2P, Proxy, All
     /// default: All
     /// </summary>
-    public NodeTransportMode TransportMode { get; set; } = NodeTransportMode.All;
+    public NodeTransportMode TransportMode { get; set; } = NodeTransportMode.ProxyOnly;
 
     /// <summary>
     /// 1 unit = 1 second
@@ -58,11 +61,10 @@ public class NodeNetwork : MonoBehaviour, IRoomInfo
     /// </summary>
     public int WaitBridgeDelayMS = 3000;
 
+    public bool DebugPacketIO = true;
+
     public event OnChangeRoomStateDelegate OnChangeRoomState = state =>
     {
-#if DEBUG
-        Debug.Log($"{nameof(NodeNetwork)} change state -> {state}");
-#endif
     };
     public event OnChangeNodesReadyDelegate OnChangeNodesReady = (current, total) => { };
     public event OnChangeNodesReadyDelayDelegate OnChangeNodesReadyDelay = (current, total) => { };
@@ -72,14 +74,29 @@ public class NodeNetwork : MonoBehaviour, IRoomInfo
     /// </summary>
     public Guid LocalNodeId { get; private set; } = Guid.Empty;
 
-    internal async void Initialize(NodeLobbyClient.RoomStartInfo startupInfo, CancellationToken cancellationToken = default)
+    public RoomStateEnum CurrentState { get; private set; }
+
+#if DEBUG
+
+    private void DebugOnChangeRoomState(RoomStateEnum state)
+    {
+        LogHandle(LoggerLevel.Debug, $"{nameof(NodeNetwork)} change state -> {state}");
+    }
+
+#endif
+
+
+    internal async void Initialize(RoomStartInfo startupInfo, CancellationToken cancellationToken = default)
         => await InitializeAsync(startupInfo, cancellationToken);
 
     public GameInfo GameInfo { get; private set; }
 
-
-    internal async Task InitializeAsync(NodeLobbyClient.RoomStartInfo startupInfo, CancellationToken cancellationToken = default)
+    internal async Task InitializeAsync(RoomStartInfo startupInfo, CancellationToken cancellationToken = default)
     {
+#if DEBUG
+        OnChangeRoomState -= DebugOnChangeRoomState;
+        OnChangeRoomState += DebugOnChangeRoomState;
+#endif
         GameInfo = new GameInfo(this);
 
         roomStartInfo = startupInfo;
@@ -95,6 +112,7 @@ public class NodeNetwork : MonoBehaviour, IRoomInfo
 
     private void OnChangeState(RoomStateEnum state)
     {
+        CurrentState = state;
         Ready = state == RoomStateEnum.Ready;
     }
 
@@ -103,22 +121,22 @@ public class NodeNetwork : MonoBehaviour, IRoomInfo
 
     private async Task TryConnectAsync(CancellationToken cancellationToken = default)
     {
-//#if DEBUG
-//        TransportMode = NodeTransportMode.P2POnly;
-//#endif
+        //#if DEBUG
+        //        TransportMode = NodeTransportMode.P2POnly;
+        //#endif
 
         try
         {
             OnChangeRoomState(RoomStateEnum.ConnectionBridge);
 
-            bridgeClient = new NodeBridgeClient(roomStartInfo.ConnectionEndPoints);
+            bridgeClient = new NodeBridgeClient(this, LogHandle, roomStartInfo.ConnectionEndPoints);
 
-            List<NodeBridgeClient.TransportSessionInfo> connectionPoints = new List<NodeBridgeClient.TransportSessionInfo>();
+            List<TransportSessionInfoModel> connectionPoints = new List<TransportSessionInfoModel>();
 
             bridgeClient.OnAvailableBridgeServersResult = (result, instance, from, servers) =>
             {
 #if DEBUG
-                Debug.Log($"Result {result} from {from}");
+                LogHandle(LoggerLevel.Debug, $"Result {result} from {from}");
 #endif
 
                 if (result)
@@ -133,13 +151,15 @@ public class NodeNetwork : MonoBehaviour, IRoomInfo
             await WaitBridgeAsync(connectionPoints, cancellationToken);
 
             if (TransportMode.HasFlag(NodeTransportMode.P2POnly))
+            {
+                //throw new Exception("Commented code");
                 CreateUdpEndPoint();
+            }
+
 
             InitializeTransportClients(connectionPoints, cancellationToken);
 
             await WaitNodeConnection(cancellationToken);
-
-            OnChangeRoomState(RoomStateEnum.Ready);
 
         }
         catch (TaskCanceledException)
@@ -149,7 +169,7 @@ public class NodeNetwork : MonoBehaviour, IRoomInfo
         }
     }
 
-    private async Task WaitBridgeAsync(List<NodeBridgeClient.TransportSessionInfo> connectionPoints, CancellationToken cancellationToken = default)
+    private async Task WaitBridgeAsync(List<TransportSessionInfoModel> connectionPoints, CancellationToken cancellationToken = default)
     {
         OnChangeRoomState(RoomStateEnum.WaitTransportServerList);
 
@@ -176,9 +196,9 @@ public class NodeNetwork : MonoBehaviour, IRoomInfo
 
                 options.StunServers.AddRange(STUNServers);
 
-                builder.AddExceptionHandleForUnity((ex, c) =>
+                builder.AddExceptionHandle((ex, c) =>
                 {
-                    Debug.LogError(ex.ToString());
+                    LogHandle(LoggerLevel.Error, ex.ToString());
                 });
 
                 //builder.AddReceivePacketHandle(NodeTransportPacketEnum.Transport,)
@@ -197,28 +217,31 @@ public class NodeNetwork : MonoBehaviour, IRoomInfo
             endPointConnectionUrl = default;
     }
 
-    private void InitializeTransportClients(List<NodeBridgeClient.TransportSessionInfo> connectionPoints, CancellationToken cancellationToken = default)
+    private void InitializeTransportClients(List<TransportSessionInfoModel> connectionPoints, CancellationToken cancellationToken = default)
     {
         OnChangeRoomState(RoomStateEnum.ConnectionTransportServers);
 
         var point = connectionPoints.First();
 
-        transportClient = new NodeRoomClient(point.ConnectionUrl);
+        transportClient = new NodeRoomClient(this, LogHandle, point.ConnectionUrl);
 
         transportClient.OnSignOnServerResult = (result, instance, url) =>
         {
             if (result)
                 return;
 
-            Debug.LogError($"Cannot sign on {nameof(NodeRoomClient)} - {url}");
+            LogHandle(LoggerLevel.Error, $"Cannot sign on {nameof(NodeRoomClient)}");
         };
 
         transportClient.OnRoomReady += (createTime, srv_offs) =>
         {
 #if DEBUG
-            Debug.Log($"{nameof(transportClient.OnRoomReady)} - {createTime} - {srv_offs}");
+            LogHandle(LoggerLevel.Debug, $"{nameof(transportClient.OnRoomReady)} - {createTime} - {srv_offs}");
 #endif
+            OnChangeRoomState(RoomStateEnum.Ready);
         };
+
+        transportClient.OnExecute += TransportClient_OnExecute;
 
 
         transportClient.OnChangeNodeList = (data, instance) =>
@@ -247,29 +270,48 @@ public class NodeNetwork : MonoBehaviour, IRoomInfo
         if (cancellationToken.IsCancellationRequested)
             throw new TaskCanceledException();
 
-        if (transportClient.Connect(LocalNodeId = point.Id, roomStartInfo.Token, endPointConnectionUrl, Log) == default)
+        if (transportClient.Connect(LocalNodeId = point.Id, roomStartInfo.Token, endPointConnectionUrl) == default)
             throw new Exception($"WaitAndRun : Can't find working transport servers");
     }
 
-    protected virtual void Log(string message)
+    private void TransportClient_OnExecute(InputPacketBuffer buffer)
     {
-        Debug.Log(message);
+        var handle = GetHandle(buffer.ReadUInt16());
+
+        if (handle == null)
+            return;
+
+        buffer.ManualDisposing = true;
+
+        ThreadHelper.InvokeOnMain(() =>
+        {
+            handle(null, buffer);
+
+            buffer.Dispose();
+        });
     }
 
     private async Task WaitNodeConnection(CancellationToken cancellationToken = default)
     {
+        OnChangeRoomState(RoomStateEnum.WaitConnections);
+
+        bool valid = false;
+
         do
         {
-            OnChangeRoomState(RoomStateEnum.WaitConnections);
+            await Task.Delay(100, cancellationToken);
 
-            for (int i = 0; i < MaxNodesWaitCycle && connectedClients.Count < roomStartInfo.TotalPlayerCount - 1; i++)
+            for (int i = 0; (i < MaxNodesWaitCycle || MaxNodesWaitCycle == 0) && connectedClients.Count < roomStartInfo.TotalPlayerCount - 1; i++)
             {
-                await Task.Delay(1000, cancellationToken);
+                await Task.Delay(200, cancellationToken);
 
                 OnChangeNodesReadyDelay(i + 1, MaxNodesWaitCycle);
             }
 
-        } while (!(await transportClient.SendReady(roomStartInfo.TotalPlayerCount, connectedClients.Select(x => x.Key).Append(LocalNodeId)) || MaxNodesWaitCycle == 0));
+            if (!valid)
+                valid = await transportClient.SendReady(roomStartInfo.TotalPlayerCount, connectedClients.Select(x => x.Key).Append(LocalNodeId));
+
+        } while (!Ready);
     }
 
     #region Transport
@@ -281,8 +323,6 @@ public class NodeNetwork : MonoBehaviour, IRoomInfo
 
         Parallel.ForEach(connectedClients, c => { c.Value.Transport(builder, code); });
 
-        //var packet = new OutputPacketBuffer().WithPid(NodeTransportPacketEnum.Broadcast);
-
         return true;
     }
 
@@ -290,9 +330,8 @@ public class NodeNetwork : MonoBehaviour, IRoomInfo
     {
         if (!Ready)
             return false;
-        Parallel.ForEach(connectedClients, c => { c.Value.Transport(builder); });
 
-        //var packet = new OutputPacketBuffer().WithPid(NodeTransportPacketEnum.Broadcast);
+        Parallel.ForEach(connectedClients, c => { c.Value.Transport(builder); });
 
         return true;
     }
@@ -349,12 +388,12 @@ public class NodeNetwork : MonoBehaviour, IRoomInfo
 
         packet.WithPid(RoomPacketEnum.Execute);
 
-        SendToGameServer(packet);
+        SendToRoomServer(packet);
     }
 
-    public void SendToGameServer(OutputPacketBuffer packet)
+    public void SendToRoomServer(OutputPacketBuffer packet)
     {
-        transportClient.Broadcast(packet);
+        transportClient.SendToServers(packet);
     }
 
     #endregion
@@ -414,6 +453,23 @@ public class NodeNetwork : MonoBehaviour, IRoomInfo
     }
 
     #endregion
+
+    private void LogHandle(LoggerLevel level, string content)
+    {
+        switch (level)
+        {
+            case LoggerLevel.Error:
+                UnityEngine.Debug.LogError(content);
+                break;
+            case LoggerLevel.Info:
+            case LoggerLevel.Log:
+            case LoggerLevel.Debug:
+            case LoggerLevel.Performance:
+            default:
+                UnityEngine.Debug.Log(content);
+                break;
+        }
+    }
 }
 
 
@@ -442,3 +498,5 @@ public enum NodeTransportMode
     ProxyOnly = 2,
     All = P2POnly | ProxyOnly
 }
+
+public delegate void NodeLogDelegate(LoggerLevel level, string content);

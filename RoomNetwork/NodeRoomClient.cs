@@ -2,15 +2,15 @@ using NSL.BuilderExtensions.SocketCore;
 using NSL.BuilderExtensions.SocketCore.Unity;
 using NSL.BuilderExtensions.WebSocketsClient;
 using NSL.Node.RoomServer.Shared.Client.Core.Enums;
-using NSL.SocketClient;
 using NSL.SocketCore.Extensions.Buffer;
 using NSL.SocketCore.Utils.Buffer;
+using NSL.SocketCore.Utils.Logger.Enums;
 using NSL.WebSockets.Client;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Net;
 using System.Threading.Tasks;
+using UnityEditor;
 
 public class NodeRoomClient : IDisposable
 {
@@ -22,17 +22,25 @@ public class NodeRoomClient : IDisposable
 
     private readonly IEnumerable<Uri> wssUrls;
 
+    private readonly NodeNetwork node;
+    private readonly NodeLogDelegate logHandle;
+
     private Dictionary<Uri, WSNetworkClient<RoomNetworkClient, WSClientOptions<RoomNetworkClient>>> connections = new Dictionary<Uri, WSNetworkClient<RoomNetworkClient, WSClientOptions<RoomNetworkClient>>>();
 
-    public NodeRoomClient(IEnumerable<string> wssUrls) : this(wssUrls.Select(x => new Uri(x))) { }
+    public NodeRoomClient(NodeNetwork node, NodeLogDelegate logHandle, IEnumerable<string> wssUrls)
+        : this(node, logHandle, wssUrls.Select(x => new Uri(x))) { }
 
-    public NodeRoomClient(IEnumerable<Uri> wssUrls) { this.wssUrls = wssUrls; }
+    public NodeRoomClient(NodeNetwork node, NodeLogDelegate logHandle, IEnumerable<Uri> wssUrls)
+    {
+        this.node = node;
+        this.logHandle = logHandle;
+        this.wssUrls = wssUrls;
+    }
 
-    public NodeRoomClient(string wssUrl) : this(Enumerable.Repeat(wssUrl, 1).ToArray()) { }
+    public NodeRoomClient(NodeNetwork node, NodeLogDelegate logHandle, string wssUrl)
+        : this(node, logHandle, Enumerable.Repeat(wssUrl, 1).ToArray()) { }
 
-    public NodeRoomClient(Uri wssUrl) : this(Enumerable.Repeat(wssUrl, 1).ToArray()) { }
-
-    public async Task<int> Connect(Guid nodeIdentity, string sessionIdentity, string endPoint, Action<string> log, int connectionTimeout = 2000)
+    public async Task<int> Connect(Guid nodeIdentity, string sessionIdentity, string endPoint, int connectionTimeout = 2000)
     {
         foreach (var item in connections)
         {
@@ -64,15 +72,18 @@ public class NodeRoomClient : IDisposable
                         client.Network.Send(packet);
                     });
 
-                    builder.AddSendHandleForUnity((c, pid, len, st) =>
+                    if (node.DebugPacketIO)
                     {
-                        log?.Invoke($"[Room Server] Send {pid}");
-                    });
+                        builder.AddSendHandle((c, pid, len, st) =>
+                        {
+                            logHandle?.Invoke(LoggerLevel.Info, $"[Room Server] Send {pid}");
+                        });
 
-                    builder.AddReceiveHandleForUnity((c, pid, len) =>
-                    {
-                        log?.Invoke($"[Room Server] Receive {pid}");
-                    });
+                        builder.AddReceiveHandle((c, pid, len) =>
+                        {
+                            logHandle?.Invoke(LoggerLevel.Info, $"[Room Server] Receive {pid}");
+                        });
+                    }
 
                     builder.AddPacketHandle(RoomPacketEnum.SignSessionResult, OnSignSessionReceive);
                     builder.AddPacketHandle(RoomPacketEnum.ChangeNodeList, OnChangeNodeListReceive);
@@ -126,7 +137,7 @@ public class NodeRoomClient : IDisposable
         return state;
     }
 
-    public void Broadcast(OutputPacketBuffer packet)
+    public void SendToServers(OutputPacketBuffer packet)
     {
         foreach (var item in connections)
         {
@@ -148,8 +159,8 @@ public class NodeRoomClient : IDisposable
         if (result)
             client.RequestServerTimeOffset();
         else
-        { 
-        
+        {
+
         }
 
         OnSignOnServerResult(result, this, client.Url);
@@ -165,7 +176,7 @@ public class NodeRoomClient : IDisposable
         var offset = client.ServerDateTimeOffset;
 
         if ((offset < TimeSpan.Zero && offset > TimeSpan.FromMilliseconds(-100)) || (offset > TimeSpan.Zero && offset < TimeSpan.FromMilliseconds(100)))
-                offset = TimeSpan.Zero;
+            offset = TimeSpan.Zero;
 
         OnRoomReady(data.ReadDateTime(), offset);
     }
