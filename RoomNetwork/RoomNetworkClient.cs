@@ -4,9 +4,13 @@ using System;
 
 public class RoomNetworkClient : BaseSocketNetworkClient
 {
-    public Uri Url { get; set; }
+    public Uri ServerUrl { get; set; }
 
     public PacketWaitBuffer PacketWaitBuffer { get; }
+
+    public RoomSessionInfoModel SessionInfo { get; set; }
+
+    public Guid LocalNodeIdentity => SessionInfo.Id;
 
     public RoomNetworkClient()
     {

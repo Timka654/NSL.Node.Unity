@@ -1,71 +1,54 @@
-using NSL.BuilderExtensions.SocketCore;
-using NSL.BuilderExtensions.SocketCore.Unity;
-using NSL.BuilderExtensions.UDPServer;
-using NSL.Node.BridgeServer.Shared.Enums;
 using NSL.Node.RoomServer.Shared.Client.Core;
 using NSL.Node.RoomServer.Shared.Client.Core.Enums;
 using NSL.SocketCore.Utils.Buffer;
 using NSL.SocketCore.Utils.Logger.Enums;
-using NSL.SocketServer.Utils;
 using NSL.UDP.Client;
-using NSL.UDP.Client.Info;
-using NSL.UDP.Client.Interface;
-using NSL.Utils;
-using NSL.Utils.Unity;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
-using System.Net;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 
-public class NodeNetwork : UnityEngine.MonoBehaviour, IRoomInfo
+public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
+    where TRoomInfo : GameInfo
 {
     public NodeBridgeClient bridgeClient;
 
-    public NodeRoomClient transportClient;
+    public NodeRoomClient roomClient;
 
     private RoomStartInfo roomStartInfo;
 
-    private UDPServer<UDPNodeServerNetworkClient> endPoint;
+    private UDPServer<UDPNodeServerNetworkClient> udpBindingPoint;
 
-    private string endPointConnectionUrl;
+    private string udpEndPointConnectionUrl;
 
     private ConcurrentDictionary<Guid, NodeClient> connectedClients = new ConcurrentDictionary<Guid, NodeClient>();
-
-    private List<StunServerInfo> STUNServers = new List<StunServerInfo>()
-    {
-        new StunServerInfo("stun.l.google.com:19302"),
-        new StunServerInfo("stun1.l.google.com:19302"),
-        new StunServerInfo("stun2.l.google.com:19302"),
-        new StunServerInfo("stun3.l.google.com:19302"),
-        new StunServerInfo("stun4.l.google.com:19302")
-    };
 
     /// <summary>
     /// Can set how transport all data - P2P, Proxy, All
     /// default: All
     /// </summary>
-    public NodeTransportMode TransportMode { get; set; } = NodeTransportMode.ProxyOnly;
+    public NodeTransportModeEnum TransportMode { get; set; } = NodeTransportModeEnum.ProxyOnly;
 
     /// <summary>
     /// 1 unit = 1 second
     /// for no wait connections set this value to default = 0
     /// </summary>
-    public int MaxNodesWaitCycle = 10;
+    public int MaxNodesWaitCycle { get; set; } = 10;
 
     /// <summary>
     /// Receive transport servers from bridge server delay before continue
     /// </summary>
-    public int WaitBridgeDelayMS = 3000;
+    public int WaitBridgeDelayMS { get; set; } = 10_000;
 
-    public bool DebugPacketIO = true;
+    public bool DebugPacketIO { get; set; } = true;
 
     public event OnChangeRoomStateDelegate OnChangeRoomState = state =>
     {
     };
+
     public event OnChangeNodesReadyDelegate OnChangeNodesReady = (current, total) => { };
     public event OnChangeNodesReadyDelayDelegate OnChangeNodesReadyDelay = (current, total) => { };
 
@@ -74,22 +57,21 @@ public class NodeNetwork : UnityEngine.MonoBehaviour, IRoomInfo
     /// </summary>
     public Guid LocalNodeId { get; private set; } = Guid.Empty;
 
-    public RoomStateEnum CurrentState { get; private set; }
+    public NodeRoomStateEnum CurrentState { get; private set; }
+
+    public TRoomInfo RoomInfo { get; private set; }
 
 #if DEBUG
 
-    private void DebugOnChangeRoomState(RoomStateEnum state)
+    private void DebugOnChangeRoomState(NodeRoomStateEnum state)
     {
-        LogHandle(LoggerLevel.Debug, $"{nameof(NodeNetwork)} change state -> {state}");
+        LogHandle(LoggerLevel.Debug, $"{nameof(NodeNetwork<TRoomInfo>)} change state -> {state}");
     }
 
 #endif
 
-
     internal async void Initialize(RoomStartInfo startupInfo, CancellationToken cancellationToken = default)
         => await InitializeAsync(startupInfo, cancellationToken);
-
-    public GameInfo GameInfo { get; private set; }
 
     internal async Task InitializeAsync(RoomStartInfo startupInfo, CancellationToken cancellationToken = default)
     {
@@ -97,154 +79,88 @@ public class NodeNetwork : UnityEngine.MonoBehaviour, IRoomInfo
         OnChangeRoomState -= DebugOnChangeRoomState;
         OnChangeRoomState += DebugOnChangeRoomState;
 #endif
-        GameInfo = new GameInfo(this);
+        RoomInfo = Activator.CreateInstance(typeof(TRoomInfo), this) as TRoomInfo;
 
         roomStartInfo = startupInfo;
 
         OnChangeRoomState -= OnChangeState;
         OnChangeRoomState += OnChangeState;
 
-        await TryConnectAsync(cancellationToken);
+        try
+        {
+            var connectionPoints = await initBridges(cancellationToken);
+
+            await initUDPBindingPoint(cancellationToken);
+
+            await initRooms(connectionPoints, cancellationToken);
+
+            await waitNodeConnection(cancellationToken);
+
+        }
+        catch (TaskCanceledException)
+        {
+            Dispose();
+        }
 
     }
 
     public bool Ready { get; private set; }
 
-    private void OnChangeState(RoomStateEnum state)
+    private void OnChangeState(NodeRoomStateEnum state)
     {
         CurrentState = state;
-        Ready = state == RoomStateEnum.Ready;
+        Ready = state == NodeRoomStateEnum.Ready;
     }
 
-    private async void TryConnect(CancellationToken cancellationToken = default)
-        => await TryConnectAsync(cancellationToken);
-
-    private async Task TryConnectAsync(CancellationToken cancellationToken = default)
+    private async Task<IEnumerable<RoomSessionInfoModel>> initBridges(CancellationToken cancellationToken)
     {
-        //#if DEBUG
-        //        TransportMode = NodeTransportMode.P2POnly;
-        //#endif
+        cancellationToken.ThrowIfCancellationRequested();
 
-        try
+        bridgeClient = new NodeBridgeClient(
+            this,
+            LogHandle,
+            OnChangeRoomState,
+            roomStartInfo);
+
+        return await bridgeClient.Initialize(cancellationToken);
+    }
+
+    private Task initUDPBindingPoint(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (TransportMode.HasFlag(NodeTransportModeEnum.P2POnly))
         {
-            OnChangeRoomState(RoomStateEnum.ConnectionBridge);
-
-            bridgeClient = new NodeBridgeClient(this, LogHandle, roomStartInfo.ConnectionEndPoints);
-
-            List<TransportSessionInfoModel> connectionPoints = new List<TransportSessionInfoModel>();
-
-            bridgeClient.OnAvailableBridgeServersResult = (result, instance, from, servers) =>
-            {
-#if DEBUG
-                LogHandle(LoggerLevel.Debug, $"Result {result} from {from}");
-#endif
-
-                if (result)
-                    connectionPoints.AddRange(servers);
-            };
-
-            int serverCount = bridgeClient.Connect(roomStartInfo.ServerIdentity, roomStartInfo.RoomId, roomStartInfo.Token);
-
-            if (serverCount == default)
-                throw new Exception($"Can't find working servers");
-
-            await WaitBridgeAsync(connectionPoints, cancellationToken);
-
-            if (TransportMode.HasFlag(NodeTransportMode.P2POnly))
-            {
-                //throw new Exception("Commented code");
-                CreateUdpEndPoint();
-            }
-
-
-            InitializeTransportClients(connectionPoints, cancellationToken);
-
-            await WaitNodeConnection(cancellationToken);
-
+            //throw new Exception("Commented code");
+            this.udpBindingPoint = BaseUDPNode.CreateUDPEndPoint(
+                this,
+                point => udpEndPointConnectionUrl = point?.ToString(),
+                LogHandle);
         }
-        catch (TaskCanceledException)
-        {
-            // todo: dispose all
-            throw;
-        }
+
+        return Task.CompletedTask;
     }
 
-    private async Task WaitBridgeAsync(List<TransportSessionInfoModel> connectionPoints, CancellationToken cancellationToken = default)
+    #region Room
+
+    private Task initRooms(IEnumerable<RoomSessionInfoModel> connectionPoints, CancellationToken cancellationToken)
     {
-        OnChangeRoomState(RoomStateEnum.WaitTransportServerList);
+        cancellationToken.ThrowIfCancellationRequested();
 
-#if DEBUG
-        WaitBridgeDelayMS = 10_000;
-#endif
+        roomClient = new NodeRoomClient(
+            this,
+            LogHandle,
+            OnChangeRoomState,
+            roomStartInfo,
+            connectionPoints,
+            udpEndPointConnectionUrl);
 
-        await Task.Delay(WaitBridgeDelayMS, cancellationToken);
-
-        if (!connectionPoints.Any())
-            throw new Exception($"WaitAndRun : Can't find any working servers");
-    }
-
-    private void CreateUdpEndPoint()
-    {
-        endPoint = UDPServerEndPointBuilder
-            .Create()
-            .WithClientProcessor<UDPNodeServerNetworkClient>()
-            .WithOptions<UDPServerOptions<UDPNodeServerNetworkClient>>()
-            .WithBindingPoint(new IPEndPoint(IPAddress.Any, 0))
-            .WithCode(builder =>
-            {
-                var options = builder.GetOptions() as ISTUNOptions;
-
-                options.StunServers.AddRange(STUNServers);
-
-                builder.AddExceptionHandle((ex, c) =>
-                {
-                    LogHandle(LoggerLevel.Error, ex.ToString());
-                });
-
-                //builder.AddReceivePacketHandle(NodeTransportPacketEnum.Transport,)
-            })
-            .Build();
-
-        endPoint.Start();
-
-        if (endPoint?.StunInformation != null)
-            endPointConnectionUrl = NSLEndPoint.FromIPAddress(
-                NSLEndPoint.Type.UDP,
-                endPoint.StunInformation.PublicEndPoint.Address,
-                endPoint.StunInformation.PublicEndPoint.Port
-                ).ToString();
-        else
-            endPointConnectionUrl = default;
-    }
-
-    private void InitializeTransportClients(List<TransportSessionInfoModel> connectionPoints, CancellationToken cancellationToken = default)
-    {
-        OnChangeRoomState(RoomStateEnum.ConnectionTransportServers);
-
-        var point = connectionPoints.First();
-
-        transportClient = new NodeRoomClient(this, LogHandle, point.ConnectionUrl);
-
-        transportClient.OnSignOnServerResult = (result, instance, url) =>
-        {
-            if (result)
-                return;
-
-            LogHandle(LoggerLevel.Error, $"Cannot sign on {nameof(NodeRoomClient)}");
-        };
-
-        transportClient.OnRoomReady += (createTime, srv_offs) =>
-        {
-#if DEBUG
-            LogHandle(LoggerLevel.Debug, $"{nameof(transportClient.OnRoomReady)} - {createTime} - {srv_offs}");
-#endif
-            OnChangeRoomState(RoomStateEnum.Ready);
-        };
-
-        transportClient.OnExecute += TransportClient_OnExecute;
+        roomClient.OnExecute += roomClient_OnExecute;
 
 
-        transportClient.OnChangeNodeList = (data, instance) =>
+        roomClient.OnTransport += roomClient_OnTransport;
+
+        roomClient.OnChangeNodeList = (roomServer, data, instance) =>
         {
             foreach (var item in data)
             {
@@ -254,9 +170,9 @@ public class NodeNetwork : UnityEngine.MonoBehaviour, IRoomInfo
                 if (item.NodeId == LocalNodeId)
                     continue;
 
-                var nodeClient = connectedClients.GetOrAdd(item.NodeId, id => new NodeClient(item, this, instance));
+                var nodeClient = connectedClients.GetOrAdd(item.NodeId, id => new NodeClient(item, roomServer, this, instance));
 
-                if (nodeClient.State == NodeClientState.None)
+                if (nodeClient.State == NodeClientStateEnum.None)
                 {
 
                     if (!nodeClient.TryConnect(item))
@@ -267,33 +183,27 @@ public class NodeNetwork : UnityEngine.MonoBehaviour, IRoomInfo
             OnChangeNodesReady(data.Count(), roomStartInfo.TotalPlayerCount);
         };
 
-        if (cancellationToken.IsCancellationRequested)
-            throw new TaskCanceledException();
-
-        if (transportClient.Connect(LocalNodeId = point.Id, roomStartInfo.Token, endPointConnectionUrl) == default)
-            throw new Exception($"WaitAndRun : Can't find working transport servers");
+        return roomClient.Initialize(cancellationToken);
     }
 
-    private void TransportClient_OnExecute(InputPacketBuffer buffer)
+    private void roomClient_OnExecute(InputPacketBuffer buffer)
     {
-        var handle = GetHandle(buffer.ReadUInt16());
+        Invoke((PlayerInfo)null, buffer);
+    }
 
-        if (handle == null)
+    private void roomClient_OnTransport(Guid playerId, InputPacketBuffer buffer)
+    {
+        if (!connectedClients.TryGetValue(playerId, out var client))
             return;
 
-        buffer.ManualDisposing = true;
-
-        ThreadHelper.InvokeOnMain(() =>
-        {
-            handle(null, buffer);
-
-            buffer.Dispose();
-        });
+        Invoke(client.PlayerInfo, buffer);
     }
 
-    private async Task WaitNodeConnection(CancellationToken cancellationToken = default)
+    #endregion
+
+    private async Task waitNodeConnection(CancellationToken cancellationToken)
     {
-        OnChangeRoomState(RoomStateEnum.WaitConnections);
+        OnChangeRoomState(NodeRoomStateEnum.WaitConnections);
 
         bool valid = false;
 
@@ -309,7 +219,7 @@ public class NodeNetwork : UnityEngine.MonoBehaviour, IRoomInfo
             }
 
             if (!valid)
-                valid = await transportClient.SendReady(roomStartInfo.TotalPlayerCount, connectedClients.Select(x => x.Key).Append(LocalNodeId));
+                valid = await roomClient.SendReady(roomStartInfo.TotalPlayerCount, connectedClients.Select(x => x.Key).Append(LocalNodeId));
 
         } while (!Ready);
     }
@@ -393,7 +303,7 @@ public class NodeNetwork : UnityEngine.MonoBehaviour, IRoomInfo
 
     public void SendToRoomServer(OutputPacketBuffer packet)
     {
-        transportClient.SendToServers(packet);
+        roomClient.SendToServers(packet);
     }
 
     #endregion
@@ -418,6 +328,24 @@ public class NodeNetwork : UnityEngine.MonoBehaviour, IRoomInfo
             return handle;
 
         return null;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public void Invoke(PlayerInfo nodePlayer, InputPacketBuffer buffer)
+    {
+        var code = buffer.ReadUInt16();
+
+        var handle = GetHandle(code);
+
+        if (handle == null)
+            return;
+
+        handle(nodePlayer, buffer);
+    }
+
+    public virtual void Invoke(Action action, InputPacketBuffer buffer)
+    {
+        action();
     }
 
     #endregion
@@ -454,49 +382,22 @@ public class NodeNetwork : UnityEngine.MonoBehaviour, IRoomInfo
 
     #endregion
 
-    private void LogHandle(LoggerLevel level, string content)
+    protected virtual void LogHandle(LoggerLevel level, string content)
     {
-        switch (level)
+    }
+
+    public void Dispose()
+    {
+        if (RoomInfo is IDisposable d)
+            d.Dispose();
+
+        bridgeClient?.Dispose();
+        roomClient?.Dispose();
+        udpBindingPoint?.Stop();
+
+        foreach (var item in connectedClients)
         {
-            case LoggerLevel.Error:
-                UnityEngine.Debug.LogError(content);
-                break;
-            case LoggerLevel.Info:
-            case LoggerLevel.Log:
-            case LoggerLevel.Debug:
-            case LoggerLevel.Performance:
-            default:
-                UnityEngine.Debug.Log(content);
-                break;
+            item.Value.PlayerInfo.Network.Dispose();
         }
     }
 }
-
-
-public class UDPNodeServerNetworkClient : IServerNetworkClient
-{
-
-}
-
-public delegate void OnChangeRoomStateDelegate(RoomStateEnum state);
-public delegate void OnChangeNodesReadyDelegate(int current, int total);
-public delegate void OnChangeNodesReadyDelayDelegate(int current, int total);
-
-public enum RoomStateEnum
-{
-    ConnectionBridge,
-    WaitTransportServerList,
-    ConnectionTransportServers,
-    WaitConnections,
-    Ready
-}
-
-[Flags]
-public enum NodeTransportMode
-{
-    P2POnly = 1,
-    ProxyOnly = 2,
-    All = P2POnly | ProxyOnly
-}
-
-public delegate void NodeLogDelegate(LoggerLevel level, string content);

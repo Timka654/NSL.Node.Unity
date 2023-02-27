@@ -12,6 +12,6 @@ public class NodeConnectionInfoModel
     {
         this.NodeId = nodeId;
         this.EndPoint = endPoint;
-        Token = token;
+        this.Token = token;
     }
 }

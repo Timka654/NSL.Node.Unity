@@ -8,44 +8,34 @@ using NSL.SocketCore.Utils.Buffer;
 using NSL.UDP.Client;
 using NSL.Utils;
 using System;
-using System.Collections.Concurrent;
-
-public enum NodeClientState
-{
-    None,
-    Connected,
-    OnlyProxy,
-}
 
 public class NodeClient : INetworkClient, IPlayerNetwork
 {
-    public NodeNetwork NodeNetwork { get; }
+    public INodeNetwork NodeNetwork { get; }
 
     public string Token => connectionInfo.Token;
 
     public Guid PlayerId => connectionInfo.NodeId;
 
-    public bool IsLocalNode => NodeNetwork.LocalNodeId == PlayerId;
+    public bool IsLocalNode => roomServer.LocalNodeIdentity == PlayerId;
 
     public NodeRoomClient Proxy { get; }
 
     public string EndPoint => connectionInfo.EndPoint;
 
-    public NodeClientState State { get; private set; }
+    public NodeClientStateEnum State { get; private set; }
 
     public event NodeClientStateChangeDelegate OnStateChanged = (nstate, ostate) => { };
 
     public PlayerInfo PlayerInfo { get; private set; }
 
-    public NodeClient(NodeConnectionInfoModel connectionInfo, NodeNetwork nodeNetwork, NodeRoomClient proxy)
+    public NodeClient(NodeConnectionInfoModel connectionInfo, RoomNetworkClient roomServer, INodeNetwork nodeNetwork, NodeRoomClient proxy)
     {
         this.connectionInfo = connectionInfo;
-
+        this.roomServer = roomServer;
         NodeNetwork = nodeNetwork;
         Proxy = proxy;
         PlayerInfo = new PlayerInfo() { Id = PlayerId, Network = this };
-
-        proxy.OnTransport += Proxy_OnTransport;
     }
 
     private void Proxy_OnTransport(Guid playerId, InputPacketBuffer buffer)
@@ -53,33 +43,26 @@ public class NodeClient : INetworkClient, IPlayerNetwork
         if (playerId != PlayerId)
             return;
 
-        var code = buffer.ReadUInt16();
-
-        var handle = NodeNetwork.GetHandle(code);
-
-        //if (handle == null)
-        //    Debug.LogError($"{nameof(NodeClient)} Cannot find handle for code {code}"); // todo
-
-        handle(PlayerInfo, buffer);
+        NodeNetwork.Invoke(PlayerInfo, buffer);
     }
 
     public bool TryConnect(NodeConnectionInfoModel connectionInfo)
     {
-        if (State != NodeClientState.None && EndPoint.Equals(connectionInfo.EndPoint))
+        if (State != NodeClientStateEnum.None && EndPoint.Equals(connectionInfo.EndPoint))
             return true;
 
         this.connectionInfo = connectionInfo;
 
         var oldState = State;
 
-        if (string.IsNullOrWhiteSpace(EndPoint) || NodeNetwork.TransportMode.Equals(NodeTransportMode.ProxyOnly))
+        if (string.IsNullOrWhiteSpace(EndPoint) || NodeNetwork.TransportMode.Equals(NodeTransportModeEnum.ProxyOnly))
         {
-            if (State == NodeClientState.Connected && udpNetwork != null)
+            if (State == NodeClientStateEnum.Connected && udpNetwork != null)
             {
                 udpNetwork.Disconnect();
             }
 
-            State = NodeClientState.OnlyProxy;
+            State = NodeClientStateEnum.OnlyProxy;
 
             if (!oldState.Equals(State)) OnStateChanged(State, oldState);
 
@@ -92,18 +75,14 @@ public class NodeClient : INetworkClient, IPlayerNetwork
 
         switch (point.ProtocolType)
         {
-            case NSLEndPoint.Type.Unknown:
-            case NSLEndPoint.Type.TCP:
-            case NSLEndPoint.Type.WS:
-                throw new Exception($"Unsupported protocol {point.ProtocolType} for {nameof(NodeClient)} P2P connection");
             case NSLEndPoint.Type.UDP:
                 result = createUdp(point.Address, point.Port);
                 break;
             default:
-                break;
+                throw new Exception($"Unsupported protocol {point.ProtocolType} for {nameof(NodeClient)} P2P connection");
         }
 
-        State = result ? NodeClientState.Connected : NodeClientState.OnlyProxy;
+        State = result ? NodeClientStateEnum.Connected : NodeClientStateEnum.OnlyProxy;
 
         if (!oldState.Equals(State)) OnStateChanged(State, oldState);
 
@@ -134,10 +113,10 @@ public class NodeClient : INetworkClient, IPlayerNetwork
 
     public void Send(OutputPacketBuffer packet, bool disposeOnSend = true)
     {
-        if (networkClient != null)
-            networkClient.Send(packet, false);
+        if (udpClient != null)
+            udpClient.Send(packet, false);
 
-        if (NodeNetwork.TransportMode.HasFlag(NodeTransportMode.ProxyOnly))
+        if (NodeNetwork.TransportMode.HasFlag(NodeTransportModeEnum.ProxyOnly))
             Proxy.SendToServers(packet);
 
         if (disposeOnSend)
@@ -155,14 +134,12 @@ public class NodeClient : INetworkClient, IPlayerNetwork
                 builder.AddConnectHandle(client =>
                 {
                     client.PingPongEnabled = true;
-
-                    networkClient = client.Network;
                 });
             })
             .Build();
 
         udpNetwork.Connect();
-
+        udpClient = udpNetwork.GetClient();
         return true;
     }
 
@@ -173,28 +150,17 @@ public class NodeClient : INetworkClient, IPlayerNetwork
         Proxy_OnTransport(PlayerId, buffer);
     }
 
-    #region Transport
-
-    private uint pid = 0;
-
-    private uint lClearPID = 0;
-
-    private ConcurrentDictionary<uint, InputPacketBuffer> receiveBuffer = new ConcurrentDictionary<uint, InputPacketBuffer>();
-
-    private void IncrementPid()
+    public override void Dispose()
     {
-        lock (this)
-        {
-            pid++;
-        }
-    }
+        base.Dispose();
 
-    #endregion
+        udpNetwork?.Disconnect();
+    }
 
     private UDPNetworkClient<NodeNetworkClient> udpNetwork;
 
-    private INetworkNode networkClient;
-    private NodeConnectionInfoModel connectionInfo;
-}
+    private INetworkNode udpClient;
 
-public delegate void NodeClientStateChangeDelegate(NodeClientState newState, NodeClientState oldState);
+    private NodeConnectionInfoModel connectionInfo;
+    private readonly RoomNetworkClient roomServer;
+}

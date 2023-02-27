@@ -2,6 +2,6 @@
 using System;
 
 public class BridgeNetworkClient : BaseSocketNetworkClient
-    {
-        public Uri Url { get; set; }
-    }
+{
+    public Uri Url { get; set; }
+}

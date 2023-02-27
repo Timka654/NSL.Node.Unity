@@ -5,13 +5,15 @@ using System.Linq;
 
 public class NodeSessionStartupModel
 {
-    public string Token { get; }
+    public string Token { get; protected set; }
 
-    public Guid RoomId { get; }
+    public Guid RoomId { get; protected set; }
 
-    public string ServerIdentity { get; }
+    public string ServerIdentity { get; protected set; }
 
-    public List<string> ConnectionEndPoints { get; }
+    public List<string> ConnectionEndPoints { get; protected set; }
+
+    public NodeSessionStartupModel() { }
 
     public NodeSessionStartupModel(InputPacketBuffer buffer)
     {

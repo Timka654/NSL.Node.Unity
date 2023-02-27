@@ -1,5 +1,4 @@
 using NSL.BuilderExtensions.SocketCore;
-using NSL.BuilderExtensions.SocketCore.Unity;
 using NSL.BuilderExtensions.WebSocketsClient;
 using NSL.Node.RoomServer.Shared.Client.Core.Enums;
 using NSL.SocketCore.Extensions.Buffer;
@@ -9,65 +8,76 @@ using NSL.WebSockets.Client;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
-using UnityEditor;
 
 public class NodeRoomClient : IDisposable
 {
-    public delegate void OnReceiveSignSessionResultDelegate(bool result, NodeRoomClient instance, Uri from);
-    public delegate void OnReceiveNodeListDelegate(IEnumerable<NodeConnectionInfoModel> nodes, NodeRoomClient instance);
-    public delegate void OnExecuteDelegate(InputPacketBuffer buffer);
-    public delegate void OnReceiveNodeTransportDelegate(Guid nodeId, InputPacketBuffer buffer);
-    public delegate void OnRoomReadyDelegate(DateTime createTime, TimeSpan serverTimeOffset);
-
-    private readonly IEnumerable<Uri> wssUrls;
-
-    private readonly NodeNetwork node;
+    private readonly INodeNetworkOptions node;
     private readonly NodeLogDelegate logHandle;
+    private readonly OnChangeRoomStateDelegate changeStateHandle;
+    private readonly RoomStartInfo roomStartInfo;
+    private readonly IEnumerable<RoomSessionInfoModel> connectionPoints;
+    private readonly string localNodeUdpEndPoint;
+
+    public int ConnectionTimeout { get; set; } = 10_000;
 
     private Dictionary<Uri, WSNetworkClient<RoomNetworkClient, WSClientOptions<RoomNetworkClient>>> connections = new Dictionary<Uri, WSNetworkClient<RoomNetworkClient, WSClientOptions<RoomNetworkClient>>>();
 
-    public NodeRoomClient(NodeNetwork node, NodeLogDelegate logHandle, IEnumerable<string> wssUrls)
-        : this(node, logHandle, wssUrls.Select(x => new Uri(x))) { }
-
-    public NodeRoomClient(NodeNetwork node, NodeLogDelegate logHandle, IEnumerable<Uri> wssUrls)
+    public NodeRoomClient(
+        INodeNetworkOptions node, 
+        NodeLogDelegate logHandle,
+        OnChangeRoomStateDelegate changeStateHandle,
+        RoomStartInfo roomStartInfo,
+        IEnumerable<RoomSessionInfoModel> connectionPoints,
+        string localNodeUdpEndPoint)
     {
         this.node = node;
         this.logHandle = logHandle;
-        this.wssUrls = wssUrls;
+        this.changeStateHandle = changeStateHandle;
+        this.roomStartInfo = roomStartInfo;
+        this.connectionPoints = connectionPoints;
+        this.localNodeUdpEndPoint = localNodeUdpEndPoint;
+    }
+    public Task Initialize(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        changeStateHandle(NodeRoomStateEnum.ConnectionTransportServers);
+
+        if (connectToServers(cancellationToken) == default)
+            throw new Exception($"WaitAndRun : Can't find working transport servers");
+
+        return Task.CompletedTask;
     }
 
-    public NodeRoomClient(NodeNetwork node, NodeLogDelegate logHandle, string wssUrl)
-        : this(node, logHandle, Enumerable.Repeat(wssUrl, 1).ToArray()) { }
-
-    public async Task<int> Connect(Guid nodeIdentity, string sessionIdentity, string endPoint, int connectionTimeout = 2000)
+    private async Task<int> connectToServers(CancellationToken cancellationToken)
     {
-        foreach (var item in connections)
-        {
-            if (item.Value.GetState())
-                item.Value.Disconnect();
-        }
+        cancellationToken.ThrowIfCancellationRequested();
 
-        connections.Clear();
+        Dispose();
 
-        var bridgeServers = wssUrls.ToDictionary(
-            uri => uri,
-            uri => WebSocketsClientEndPointBuilder.Create()
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var bridgeServers = connectionPoints.ToDictionary(
+            point => new Uri(point.ConnectionUrl),
+            point => WebSocketsClientEndPointBuilder.Create()
                 .WithClientProcessor<RoomNetworkClient>()
                 .WithOptions<WSClientOptions<RoomNetworkClient>>()
                 .WithCode(builder =>
                 {
                     builder.AddConnectHandle(client =>
                     {
-                        client.Url = uri;
+                        client.ServerUrl = new Uri(point.ConnectionUrl);
+                        client.SessionInfo = point;
 
                         client.PingPongEnabled = true;
 
                         var packet = OutputPacketBuffer.Create(RoomPacketEnum.SignSession);
 
-                        packet.WriteString16(sessionIdentity);
-                        packet.WriteGuid(nodeIdentity);
-                        packet.WriteString16(endPoint);
+                        packet.WriteString16(roomStartInfo.Token);
+                        packet.WriteGuid(point.Id);
+                        packet.WriteString16(localNodeUdpEndPoint);
 
                         client.Network.Send(packet);
                     });
@@ -92,22 +102,22 @@ public class NodeRoomClient : IDisposable
                     builder.AddReceivePacketHandle(RoomPacketEnum.ReadyNodeResult, c => c.PacketWaitBuffer);
                     builder.AddPacketHandle(RoomPacketEnum.ReadyRoom, OnRoomReadyReceive);
                 })
-                .WithUrl(uri)
+                .WithUrl(new Uri(point.ConnectionUrl))
                 .Build());
 
-        var count = 0;
+        cancellationToken.ThrowIfCancellationRequested();
 
         foreach (var item in bridgeServers)
         {
-            if (!await item.Value.ConnectAsync(connectionTimeout))
+            if (!await item.Value.ConnectAsync(ConnectionTimeout))
                 continue;
 
-            count++;
+            cancellationToken.ThrowIfCancellationRequested();
 
             connections.Add(item.Key, item.Value);
         }
 
-        return count;
+        return connections.Count;
     }
 
     #region Send
@@ -160,25 +170,29 @@ public class NodeRoomClient : IDisposable
             client.RequestServerTimeOffset();
         else
         {
-
+            logHandle(LoggerLevel.Error, $"Cannot sign on {nameof(NodeRoomClient)}");
         }
-
-        OnSignOnServerResult(result, this, client.Url);
     }
 
     private void OnChangeNodeListReceive(RoomNetworkClient client, InputPacketBuffer data)
     {
-        OnChangeNodeList(data.ReadCollection(() => new NodeConnectionInfoModel(data.ReadGuid(), data.ReadString16(), data.ReadString16())), this);
+        OnChangeNodeList(client, data.ReadCollection(() => new NodeConnectionInfoModel(data.ReadGuid(), data.ReadString16(), data.ReadString16())), this);
     }
 
     private void OnRoomReadyReceive(RoomNetworkClient client, InputPacketBuffer data)
     {
         var offset = client.ServerDateTimeOffset;
 
-        if ((offset < TimeSpan.Zero && offset > TimeSpan.FromMilliseconds(-100)) || (offset > TimeSpan.Zero && offset < TimeSpan.FromMilliseconds(100)))
+        if ((offset < TimeSpan.Zero && offset > TimeSpan.FromSeconds(-1)) || (offset > TimeSpan.Zero && offset < TimeSpan.FromSeconds(1)))
             offset = TimeSpan.Zero;
 
-        OnRoomReady(data.ReadDateTime(), offset);
+        var createTime = data.ReadDateTime();
+
+#if DEBUG
+        logHandle(LoggerLevel.Debug, $"{nameof(OnRoomReadyReceive)} - {createTime} - {offset}");
+#endif
+
+        changeStateHandle(NodeRoomStateEnum.Ready);
     }
 
     private void OnTransportReceive(RoomNetworkClient client, InputPacketBuffer data)
@@ -199,15 +213,11 @@ public class NodeRoomClient : IDisposable
 
     #endregion
 
-    public OnReceiveSignSessionResultDelegate OnSignOnServerResult = (result, instance, from) => { };
+    public OnNodeRoomReceiveNodeListDelegate OnChangeNodeList = (roomServer, data, transportClient) => { };
 
-    public OnReceiveNodeListDelegate OnChangeNodeList = (data, transportClient) => { };
+    public event OnNodeRoomTransportDelegate OnTransport = (nodeId, buffer) => { };
 
-    public event OnRoomReadyDelegate OnRoomReady = (d, ts) => { };
-
-    public event OnReceiveNodeTransportDelegate OnTransport = (nodeId, buffer) => { };
-
-    public event OnExecuteDelegate OnExecute = (buffer) => { };
+    public event OnNodeRoomExecuteDelegate OnExecute = (buffer) => { };
 
     public void Dispose()
     {
