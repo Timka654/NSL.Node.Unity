@@ -52,11 +52,6 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
     public event OnChangeNodesReadyDelegate OnChangeNodesReady = (current, total) => { };
     public event OnChangeNodesReadyDelayDelegate OnChangeNodesReadyDelay = (current, total) => { };
 
-    /// <summary>
-    /// Id for local enemy
-    /// </summary>
-    public Guid LocalNodeId { get; private set; } = Guid.Empty;
-
     public NodeRoomStateEnum CurrentState { get; private set; }
 
     public TRoomInfo RoomInfo { get; private set; }
@@ -167,9 +162,6 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
                 if (cancellationToken.IsCancellationRequested)
                     return;
 
-                if (item.NodeId == LocalNodeId)
-                    continue;
-
                 var nodeClient = connectedClients.GetOrAdd(item.NodeId, id => new NodeClient(item, roomServer, this, instance));
 
                 if (nodeClient.State == NodeClientStateEnum.None)
@@ -219,7 +211,7 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
             }
 
             if (!valid)
-                valid = await roomClient.SendReady(roomStartInfo.TotalPlayerCount, connectedClients.Select(x => x.Key).Append(LocalNodeId));
+                valid = await roomClient.SendReady(roomStartInfo.TotalPlayerCount, connectedClients.Select(x => x.Key));
 
         } while (!Ready);
     }
