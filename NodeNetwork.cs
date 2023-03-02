@@ -18,6 +18,11 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
 
     public NodeRoomClient roomClient;
 
+
+    public event Action<PlayerInfo> OnNodeConnect = player => { };
+
+    public event Action OnRoomReady = () => { };
+
     private RoomStartInfo roomStartInfo;
 
     private UDPServer<UDPNodeServerNetworkClient> udpBindingPoint;
@@ -106,7 +111,7 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
         CurrentState = state;
         Ready = state == NodeRoomStateEnum.Ready;
         if (state == NodeRoomStateEnum.Ready)
-            RoomInfo.RoomReady();
+            OnRoomReady();
     }
 
     private async Task<IEnumerable<RoomSessionInfoModel>> initBridges(CancellationToken cancellationToken)
@@ -170,7 +175,7 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
                 {
 
                     if (nodeClient.TryConnect(item))
-                        RoomInfo.NodeConnect(nodeClient);
+                        OnNodeConnect(nodeClient.PlayerInfo);
                     else
                         throw new Exception($"Cannot connect");
                 }
@@ -397,6 +402,6 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
         }
     }
 
-    public IEnumerable<IPlayerNetwork> GetNodes()
-        => connectedClients.Values;
+    public IEnumerable<PlayerInfo> GetNodes()
+        => connectedClients.Values.Select(x => x.PlayerInfo).ToArray();
 }
