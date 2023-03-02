@@ -3,7 +3,6 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 
-
 public class UnityNodeRoom : UnityNodeRoom<GameInfo> { }
 
 public abstract class UnityNodeRoom<TRoomInfo> : UnityEngine.MonoBehaviour
@@ -28,23 +27,17 @@ public abstract class UnityNodeRoom<TRoomInfo> : UnityEngine.MonoBehaviour
 
     public bool DebugPacketIO = true;
 
-    public UnityNodeNetwork<TRoomInfo> NodeNetwork { get; private set; }
+    public UnityNodeNetwork<TRoomInfo> NodeNetwork { get; } = new UnityNodeNetwork<TRoomInfo>();
 
     internal async void Initialize(RoomStartInfo startupInfo, CancellationToken cancellationToken = default)
         => await InitializeAsync(startupInfo, cancellationToken);
 
     internal async Task InitializeAsync(RoomStartInfo startupInfo, CancellationToken cancellationToken = default)
     {
-        if (NodeNetwork != default)
-            throw new Exception();
-
-        NodeNetwork = new UnityNodeNetwork<TRoomInfo>()
-        {
-            TransportMode = TransportMode,
-            MaxNodesWaitCycle = MaxNodesWaitCycle,
-            WaitBridgeDelayMS = WaitBridgeDelayMS,
-            DebugPacketIO = DebugPacketIO
-        };
+        NodeNetwork.TransportMode = TransportMode;
+        NodeNetwork.MaxNodesWaitCycle = MaxNodesWaitCycle;
+        NodeNetwork.WaitBridgeDelayMS = WaitBridgeDelayMS;
+        NodeNetwork.DebugPacketIO = DebugPacketIO;
 
         await NodeNetwork.InitializeAsync(startupInfo, cancellationToken);
     }
