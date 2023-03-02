@@ -105,6 +105,8 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
     {
         CurrentState = state;
         Ready = state == NodeRoomStateEnum.Ready;
+        if (state == NodeRoomStateEnum.Ready)
+            RoomInfo.RoomReady();
     }
 
     private async Task<IEnumerable<RoomSessionInfoModel>> initBridges(CancellationToken cancellationToken)
@@ -167,7 +169,9 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
                 if (nodeClient.State == NodeClientStateEnum.None)
                 {
 
-                    if (!nodeClient.TryConnect(item))
+                    if (nodeClient.TryConnect(item))
+                        RoomInfo.NodeConnect(nodeClient);
+                    else
                         throw new Exception($"Cannot connect");
                 }
             }
@@ -392,4 +396,7 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
             item.Value.PlayerInfo.Network.Dispose();
         }
     }
+
+    public IEnumerable<IPlayerNetwork> GetNodes()
+        => connectedClients.Values;
 }

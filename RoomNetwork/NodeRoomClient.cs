@@ -59,7 +59,7 @@ public class NodeRoomClient : IDisposable
 
         cancellationToken.ThrowIfCancellationRequested();
 
-        var bridgeServers = connectionPoints.ToDictionary(
+        var roomServers = connectionPoints.ToDictionary(
             point => new Uri(point.ConnectionUrl),
             point => WebSocketsClientEndPointBuilder.Create()
                 .WithClientProcessor<RoomNetworkClient>()
@@ -107,11 +107,13 @@ public class NodeRoomClient : IDisposable
 
         cancellationToken.ThrowIfCancellationRequested();
 
-        foreach (var item in bridgeServers)
+        foreach (var item in roomServers)
         {
             if (!await item.Value.ConnectAsync(ConnectionTimeout))
+            {
+                logHandle?.Invoke(LoggerLevel.Info, $"Cannot connect to {item.Key}");
                 continue;
-
+            }
             cancellationToken.ThrowIfCancellationRequested();
 
             connections.Add(item.Key, item.Value);
