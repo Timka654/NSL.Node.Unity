@@ -35,7 +35,7 @@ public class NodeClient : INetworkClient, IPlayerNetwork
         this.roomServer = roomServer;
         NodeNetwork = nodeNetwork;
         Proxy = proxy;
-        PlayerInfo = new PlayerInfo() { Id = PlayerId, Network = this };
+        PlayerInfo = new PlayerInfo(this, PlayerId);
     }
 
     private void Proxy_OnTransport(Guid playerId, InputPacketBuffer buffer)
