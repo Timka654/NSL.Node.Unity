@@ -29,10 +29,10 @@ public abstract class UnityNodeRoom<TRoomInfo> : UnityEngine.MonoBehaviour
 
     public UnityNodeNetwork<TRoomInfo> NodeNetwork { get; } = new UnityNodeNetwork<TRoomInfo>();
 
-    internal async void Initialize(RoomStartInfo startupInfo, CancellationToken cancellationToken = default)
+    internal async void Initialize(NodeSessionStartupModel startupInfo, CancellationToken cancellationToken = default)
         => await InitializeAsync(startupInfo, cancellationToken);
 
-    internal async Task InitializeAsync(RoomStartInfo startupInfo, CancellationToken cancellationToken = default)
+    internal async Task InitializeAsync(NodeSessionStartupModel startupInfo, CancellationToken cancellationToken = default)
     {
         NodeNetwork.TransportMode = TransportMode;
         NodeNetwork.MaxNodesWaitCycle = MaxNodesWaitCycle;

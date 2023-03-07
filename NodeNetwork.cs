@@ -23,7 +23,9 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
 
     public event Action OnRoomReady = () => { };
 
-    private RoomStartInfo roomStartInfo;
+    public int TotalPlayerCount { get; private set; }
+
+    private NodeSessionStartupModel roomStartInfo;
 
     private UDPServer<UDPNodeServerNetworkClient> udpBindingPoint;
 
@@ -70,10 +72,10 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
 
 #endif
 
-    internal async void Initialize(RoomStartInfo startupInfo, CancellationToken cancellationToken = default)
+    internal async void Initialize(NodeSessionStartupModel startupInfo, CancellationToken cancellationToken = default)
         => await InitializeAsync(startupInfo, cancellationToken);
 
-    internal async Task InitializeAsync(RoomStartInfo startupInfo, CancellationToken cancellationToken = default)
+    internal async Task InitializeAsync(NodeSessionStartupModel startupInfo, CancellationToken cancellationToken = default)
     {
 #if DEBUG
         OnChangeRoomState -= DebugOnChangeRoomState;
@@ -159,8 +161,12 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
 
         roomClient.OnExecute += roomClient_OnExecute;
 
-
         roomClient.OnTransport += roomClient_OnTransport;
+
+        roomClient.OnRoomStartupInfoReceive += startupInfo =>
+        {
+            TotalPlayerCount = startupInfo.GetRoomPlayerCount();
+        };
 
         roomClient.OnChangeNodeList = (roomServer, data, instance) =>
         {
@@ -181,7 +187,7 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
                 }
             }
 
-            OnChangeNodesReady(data.Count(), roomStartInfo.TotalPlayerCount);
+            OnChangeNodesReady(data.Count(), TotalPlayerCount);
         };
 
         return roomClient.Initialize(cancellationToken);
@@ -212,7 +218,7 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
         {
             await Task.Delay(100, cancellationToken);
 
-            for (int i = 0; (i < MaxNodesWaitCycle || MaxNodesWaitCycle == 0) && connectedClients.Count < roomStartInfo.TotalPlayerCount - 1; i++)
+            for (int i = 0; (i < MaxNodesWaitCycle || MaxNodesWaitCycle == 0) && connectedClients.Count < TotalPlayerCount - 1; i++)
             {
                 await Task.Delay(200, cancellationToken);
 
@@ -220,7 +226,7 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
             }
 
             if (!valid)
-                valid = await roomClient.SendReady(roomStartInfo.TotalPlayerCount, connectedClients.Select(x => x.Key));
+                valid = await roomClient.SendReady(TotalPlayerCount, connectedClients.Select(x => x.Key));
 
         } while (!Ready);
     }

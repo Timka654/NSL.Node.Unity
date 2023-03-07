@@ -1,4 +1,5 @@
-﻿using NSL.SocketCore.Utils.Buffer;
+﻿using NSL.Node.BridgeServer.Shared;
+using NSL.SocketCore.Utils.Buffer;
 using NSL.SocketCore.Utils.Logger.Enums;
 using System;
 using System.Collections.Generic;
@@ -19,3 +20,5 @@ public delegate void OnNodeRoomReceiveNodeListDelegate(RoomNetworkClient roomSer
 public delegate void OnNodeRoomExecuteDelegate(InputPacketBuffer buffer);
 
 public delegate void OnNodeRoomTransportDelegate(Guid nodeId, InputPacketBuffer buffer);
+
+public delegate void OnRoomStartupInfoReceiveDelegate(NodeRoomStartupInfo startupInfo);

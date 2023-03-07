@@ -8,6 +8,7 @@ using NSL.WebSockets.Client;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net.Http.Headers;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -16,7 +17,7 @@ public class NodeRoomClient : IDisposable
     private readonly INodeNetworkOptions node;
     private readonly NodeLogDelegate logHandle;
     private readonly OnChangeRoomStateDelegate changeStateHandle;
-    private readonly RoomStartInfo roomStartInfo;
+    private readonly NodeSessionStartupModel roomStartInfo;
     private readonly IEnumerable<RoomSessionInfoModel> connectionPoints;
     private readonly string localNodeUdpEndPoint;
 
@@ -28,7 +29,7 @@ public class NodeRoomClient : IDisposable
         INodeNetworkOptions node, 
         NodeLogDelegate logHandle,
         OnChangeRoomStateDelegate changeStateHandle,
-        RoomStartInfo roomStartInfo,
+        NodeSessionStartupModel roomStartInfo,
         IEnumerable<RoomSessionInfoModel> connectionPoints,
         string localNodeUdpEndPoint)
     {
@@ -39,6 +40,7 @@ public class NodeRoomClient : IDisposable
         this.connectionPoints = connectionPoints;
         this.localNodeUdpEndPoint = localNodeUdpEndPoint;
     }
+
     public Task Initialize(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -101,6 +103,7 @@ public class NodeRoomClient : IDisposable
                     builder.AddPacketHandle(RoomPacketEnum.Execute, OnExecuteReceive);
                     builder.AddReceivePacketHandle(RoomPacketEnum.ReadyNodeResult, c => c.PacketWaitBuffer);
                     builder.AddPacketHandle(RoomPacketEnum.ReadyRoom, OnRoomReadyReceive);
+                    builder.AddPacketHandle(RoomPacketEnum.StartupInfoMessage, OnStartupInfoReceive);
                 })
                 .WithUrl(new Uri(point.ConnectionUrl))
                 .Build());
@@ -164,6 +167,11 @@ public class NodeRoomClient : IDisposable
 
     #region ReceiveHandles
 
+    private void OnStartupInfoReceive(RoomNetworkClient client, InputPacketBuffer data)
+    {
+        OnRoomStartupInfoReceive(new NSL.Node.BridgeServer.Shared.NodeRoomStartupInfo(data.ReadCollection(p => new KeyValuePair<string,string>(p.ReadString16(), p.ReadString16()))));
+    }
+
     private void OnSignSessionReceive(RoomNetworkClient client, InputPacketBuffer data)
     {
         var result = data.ReadBool();
@@ -220,6 +228,8 @@ public class NodeRoomClient : IDisposable
     public event OnNodeRoomTransportDelegate OnTransport = (nodeId, buffer) => { };
 
     public event OnNodeRoomExecuteDelegate OnExecute = (buffer) => { };
+
+    public event OnRoomStartupInfoReceiveDelegate OnRoomStartupInfoReceive = (startupInfo) => { };
 
     public void Dispose()
     {
