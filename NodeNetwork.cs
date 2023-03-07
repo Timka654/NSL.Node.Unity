@@ -3,6 +3,8 @@ using NSL.Node.RoomServer.Shared.Client.Core.Enums;
 using NSL.SocketCore.Utils.Buffer;
 using NSL.SocketCore.Utils.Logger.Enums;
 using NSL.UDP.Client;
+using NSL.Utils;
+using Open.Nat;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -129,20 +131,57 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
         return await bridgeClient.Initialize(cancellationToken);
     }
 
-    private Task initUDPBindingPoint(CancellationToken cancellationToken)
+    private async Task initUDPBindingPoint(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
         if (TransportMode.HasFlag(NodeTransportModeEnum.P2POnly))
         {
+            NSLEndPoint udpEndPoint = null;
+
             //throw new Exception("Commented code");
             this.udpBindingPoint = BaseUDPNode.CreateUDPEndPoint(
                 this,
-                point => udpEndPointConnectionUrl = point?.ToString(),
-                LogHandle);
+                point => udpEndPoint = point,
+            LogHandle);
+
+
+            udpEndPointConnectionUrl = udpEndPoint?.ToString();
+
+            if (udpEndPoint == null)
+                return;
+
+            var discoverer = new NatDiscoverer();
+
+            var discoverToken = new CancellationTokenSource();
+
+            discoverToken.CancelAfter(6_000);
+
+            try
+            {
+                var device = await discoverer.DiscoverDeviceAsync(PortMapper.Pmp, discoverToken);
+
+                //var exMappings = device.GetAllMappingsAsync();
+                try
+                {
+                    await device.CreatePortMapAsync(new Mapping(Protocol.Udp, udpEndPoint.Port, udpEndPoint.Port));
+                }
+                catch (MappingException mex)
+                {
+
+                }
+
+            }
+            catch (NatDeviceNotFoundException)
+            {
+
+            }
+            catch (TaskCanceledException)
+            {
+            }
+
         }
 
-        return Task.CompletedTask;
     }
 
     #region Room
