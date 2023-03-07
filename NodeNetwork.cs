@@ -10,7 +10,6 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
-using ZergRush.ReactiveCore;
 
 public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
     where TRoomInfo : GameInfo
@@ -31,15 +30,6 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
     private string udpEndPointConnectionUrl;
 
     private ConcurrentDictionary<Guid, NodeClient> connectedClients = new ConcurrentDictionary<Guid, NodeClient>();
-
-    public EventStream<BattleStartInfo> StartStream => startStream ??= new EventStream<BattleStartInfo>();
-    private EventStream<BattleStartInfo> startStream;
-
-    public EventStream<byte[]> CommandStream => commandStream ??= new EventStream<byte[]>();
-    private EventStream<byte[]> commandStream;
-
-    public EventStream<int> GameFinishStream => gameFinishStream ??= new EventStream<int>();
-    private EventStream<int> gameFinishStream;
 
     /// <summary>
     /// Can set how transport all data - P2P, Proxy, All
@@ -90,27 +80,6 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
         OnChangeRoomState += DebugOnChangeRoomState;
 #endif
         RoomInfo = Activator.CreateInstance(typeof(TRoomInfo), this) as TRoomInfo;
-
-        var battleInfo = new BattleStartInfo();
-
-        RoomInfo.OnFirstDeckReceivedFromServer += data => { battleInfo.deck1 = data; };
-        RoomInfo.OnSecondDeckReceivedFromServer += data => { battleInfo.deck2 = data; };
-        RoomInfo.OnOrderReceivedFromServer += order =>
-        {
-            battleInfo.playerOrder = order;
-        };
-
-        RoomInfo.OnGameStartFromServer += seed =>
-        {
-            battleInfo.seed = seed;
-            startStream.Send(battleInfo);
-        };
-        RoomInfo.OnGameFinishFromServer += winner =>
-        {
-            gameFinishStream.Send(winner);
-        };
-        RoomInfo.OnCommandReceivedFromServer += commandData => { commandStream.Send(commandData); };
-
 
         roomStartInfo = startupInfo;
 
