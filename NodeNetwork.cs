@@ -175,7 +175,7 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
                 if (cancellationToken.IsCancellationRequested)
                     return;
 
-                var nodeClient = connectedClients.GetOrAdd(item.NodeId, id => new NodeClient(item, roomServer, this, instance));
+                var nodeClient = connectedClients.GetOrAdd(item.NodeId, id => new NodeClient(item, roomServer, this, LogHandle, instance, udpBindingPoint));
 
                 if (nodeClient.State == NodeClientStateEnum.None)
                 {

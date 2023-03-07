@@ -5,9 +5,15 @@ using NSL.Node.RoomServer.Shared.Client.Core.Enums;
 using NSL.SocketCore;
 using NSL.SocketCore.Utils;
 using NSL.SocketCore.Utils.Buffer;
+using NSL.SocketCore.Utils.SystemPackets;
+using NSL.UDP;
 using NSL.UDP.Client;
+using NSL.UDP.Client.Interface;
 using NSL.Utils;
 using System;
+using System.Net;
+using System.Net.Sockets;
+using System.Threading.Tasks;
 
 public class NodeClient : INetworkClient, IPlayerNetwork
 {
@@ -29,12 +35,20 @@ public class NodeClient : INetworkClient, IPlayerNetwork
 
     public PlayerInfo PlayerInfo { get; private set; }
 
-    public NodeClient(NodeConnectionInfoModel connectionInfo, RoomNetworkClient roomServer, INodeNetwork nodeNetwork, NodeRoomClient proxy)
+    public NodeClient(
+        NodeConnectionInfoModel connectionInfo,
+        RoomNetworkClient roomServer,
+        INodeNetwork nodeNetwork,
+        NodeLogDelegate logHandle,
+        NodeRoomClient proxy,
+        UDPServer<UDPNodeServerNetworkClient> udpBindingPoint)
     {
         this.connectionInfo = connectionInfo;
         this.roomServer = roomServer;
         NodeNetwork = nodeNetwork;
+        this.logHandle = logHandle;
         Proxy = proxy;
+        this.udpBindingPoint = udpBindingPoint;
         PlayerInfo = new PlayerInfo(this, PlayerId);
     }
 
@@ -57,9 +71,9 @@ public class NodeClient : INetworkClient, IPlayerNetwork
 
         if (string.IsNullOrWhiteSpace(EndPoint) || NodeNetwork.TransportMode.Equals(NodeTransportModeEnum.ProxyOnly))
         {
-            if (State == NodeClientStateEnum.Connected && udpNetwork != null)
+            if (State == NodeClientStateEnum.Connected && udpClient != null)
             {
-                udpNetwork.Disconnect();
+                udpClient.Disconnect();
             }
 
             State = NodeClientStateEnum.OnlyProxy;
@@ -123,23 +137,39 @@ public class NodeClient : INetworkClient, IPlayerNetwork
             packet.Dispose();
     }
 
+    private async void RunPing(UDPClient<UDPNodeServerNetworkClient> client)
+    {
+        while (udpClient == client)
+        {
+            var packet = new DgramPacket();
+            packet.PacketId = AliveConnectionPacket.PacketId;
+
+            client.Send(packet);
+
+            await Task.Delay(1_000);
+        }
+    }
+
     private bool createUdp(string ip, int port)
     {
-        udpNetwork = UDPClientEndPointBuilder.Create()
-            .WithClientProcessor<NodeNetworkClient>()
-            .WithOptions<UDPClientOptions<NodeNetworkClient>>()
-            .UseEndPoint(ip, port)
-            .WithCode(builder =>
-            {
-                builder.AddConnectHandle(client =>
-                {
-                    client.PingPongEnabled = true;
-                });
-            })
-            .Build();
+        var bindPoint = udpBindingPoint.GetOptions() as IBindingUDPOptions;
 
-        udpNetwork.Connect();
-        udpClient = udpNetwork.GetClient();
+        var client = new UDPClient<UDPNodeServerNetworkClient>(new System.Net.IPEndPoint(IPAddress.Parse(ip), port), udpBindingPoint.GetSocket(), udpBindingPoint.GetServerOptions());
+
+        udpClient = client;
+
+        try
+        {
+            RunPing(client);
+            //udpClient.Connect();
+
+        }
+        catch (Exception ex)
+        {
+            logHandle(NSL.SocketCore.Utils.Logger.Enums.LoggerLevel.Error, ex.ToString());
+            throw;
+        }
+
         return true;
     }
 
@@ -154,13 +184,13 @@ public class NodeClient : INetworkClient, IPlayerNetwork
     {
         base.Dispose();
 
-        udpNetwork?.Disconnect();
+        udpClient?.Disconnect();
     }
-
-    private UDPNetworkClient<NodeNetworkClient> udpNetwork;
 
     private INetworkNode udpClient;
 
     private NodeConnectionInfoModel connectionInfo;
     private readonly RoomNetworkClient roomServer;
+    private readonly NodeLogDelegate logHandle;
+    private readonly UDPServer<UDPNodeServerNetworkClient> udpBindingPoint;
 }

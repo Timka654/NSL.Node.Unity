@@ -8,6 +8,7 @@ using NSL.Utils;
 using System;
 using System.Collections.Generic;
 using System.Net;
+using UnityEditor.Experimental.GraphView;
 
 public class BaseUDPNode
 {
@@ -38,11 +39,18 @@ public class BaseUDPNode
 
 				builder.AddExceptionHandle((ex, c) =>
 				{
+					if (ex is ObjectDisposedException)
+						return;
+
 					logHandle(LoggerLevel.Error, ex.ToString());
 				});
 
+                builder.AddConnectHandle(client =>
+                {
 
-				if (node.DebugPacketIO)
+                });
+
+                if (node.DebugPacketIO)
 				{
 					builder.AddSendHandle((c, pid, len, st) =>
 					{
