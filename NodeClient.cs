@@ -147,6 +147,11 @@ public class NodeClient : INetworkClient, IPlayerNetwork
             client.Send(packet);
 
             await Task.Delay(1_000);
+
+            packet = new DgramPacket();
+            packet.PacketId = 1010;
+
+            client.Send(packet);
         }
     }
 
