@@ -47,7 +47,7 @@ public class BaseUDPNode
 
                 builder.AddConnectHandle(client =>
                 {
-
+                    logHandle?.Invoke(LoggerLevel.Info, $"[UDP Binding Point] Connect new client");
                 });
 
                 builder.AddPacketHandle(1010, (client, data) => logHandle(LoggerLevel.Error, $"asafasfasfasfasfasfsafas"));
