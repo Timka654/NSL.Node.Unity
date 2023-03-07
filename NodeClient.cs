@@ -5,6 +5,7 @@ using NSL.Node.RoomServer.Shared.Client.Core.Enums;
 using NSL.SocketCore;
 using NSL.SocketCore.Utils;
 using NSL.SocketCore.Utils.Buffer;
+using NSL.SocketCore.Utils.Logger.Enums;
 using NSL.SocketCore.Utils.SystemPackets;
 using NSL.UDP;
 using NSL.UDP.Client;
@@ -14,6 +15,8 @@ using System;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading.Tasks;
+using UnityEditor.Experimental.GraphView;
+using static UnityEditor.ObjectChangeEventStream;
 
 public class NodeClient : INetworkClient, IPlayerNetwork
 {
@@ -161,19 +164,24 @@ public class NodeClient : INetworkClient, IPlayerNetwork
 
         var client = new UDPClient<UDPNodeServerNetworkClient>(new System.Net.IPEndPoint(IPAddress.Parse(ip), port), udpBindingPoint.GetSocket(), udpBindingPoint.GetServerOptions());
 
+        var node = NodeNetwork as INodeNetworkOptions;
+
+        if (node.DebugPacketIO)
+        {
+            client.OnSendPacket += (c, pid, len, st) =>
+            {
+                logHandle?.Invoke(LoggerLevel.Info, $"[UDP Binding Point ({ip}:{port})] Send {pid}");
+            };
+
+            client.OnReceivePacket += (c, pid, len) =>
+            {
+                logHandle?.Invoke(LoggerLevel.Info, $"[UDP Binding Point({ip}:{port})] Receive {pid}");
+            };
+        }
+
         udpClient = client;
 
-        try
-        {
-            RunPing(client);
-            //udpClient.Connect();
-
-        }
-        catch (Exception ex)
-        {
-            logHandle(NSL.SocketCore.Utils.Logger.Enums.LoggerLevel.Error, ex.ToString());
-            throw;
-        }
+        RunPing(client);
 
         return true;
     }
