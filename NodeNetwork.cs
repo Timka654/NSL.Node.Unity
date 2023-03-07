@@ -159,7 +159,7 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
 
             try
             {
-                var device = await discoverer.DiscoverDeviceAsync(PortMapper.Pmp, discoverToken);
+                var device = await discoverer.DiscoverDeviceAsync(PortMapper.Pmp | PortMapper.Upnp, discoverToken);
 
                 //var exMappings = device.GetAllMappingsAsync();
                 try
