@@ -8,69 +8,79 @@ using NSL.Utils;
 using System;
 using System.Collections.Generic;
 using System.Net;
+using UnityEditor.Experimental.GraphView;
 
 public class BaseUDPNode
 {
-	public static readonly IEnumerable<StunServerInfo> STUNServers = new StunServerInfo[]
-	{
-		new StunServerInfo("stun.l.google.com:19302"),
-		new StunServerInfo("stun1.l.google.com:19302"),
-		new StunServerInfo("stun2.l.google.com:19302"),
-		new StunServerInfo("stun3.l.google.com:19302"),
-		new StunServerInfo("stun4.l.google.com:19302")
-	};
+    public static readonly IEnumerable<StunServerInfo> STUNServers = new StunServerInfo[]
+    {
+        new StunServerInfo("stun.l.google.com:19302"),
+        new StunServerInfo("stun1.l.google.com:19302"),
+        new StunServerInfo("stun2.l.google.com:19302"),
+        new StunServerInfo("stun3.l.google.com:19302"),
+        new StunServerInfo("stun4.l.google.com:19302")
+    };
 
-	public static UDPServer<UDPNodeServerNetworkClient> CreateUDPEndPoint(
-        INodeNetworkOptions node, 
-		Action<NSLEndPoint> getEndPoint, 
-		NodeLogDelegate logHandle)
-	{
-		var endPoint = UDPServerEndPointBuilder
-			.Create()
-			.WithClientProcessor<UDPNodeServerNetworkClient>()
-			.WithOptions<UDPServerOptions<UDPNodeServerNetworkClient>>()
-			.WithBindingPoint(new IPEndPoint(IPAddress.Any, 0))
-			.WithCode(builder =>
-			{
-				var options = builder.GetOptions() as ISTUNOptions;
+    public static UDPServer<UDPNodeServerNetworkClient> CreateUDPEndPoint(
+        INodeNetworkOptions node,
+        Action<NSLEndPoint> getEndPoint,
+        NodeLogDelegate logHandle)
+    {
+        var endPoint = UDPServerEndPointBuilder
+            .Create()
+            .WithClientProcessor<UDPNodeServerNetworkClient>()
+            .WithOptions<UDPServerOptions<UDPNodeServerNetworkClient>>()
+            .WithBindingPoint(new IPEndPoint(IPAddress.Any, 0))
+            .WithCode(builder =>
+            {
+                var options = builder.GetOptions() as ISTUNOptions;
 
-				options.StunServers.AddRange(STUNServers);
+                options.StunServers.AddRange(STUNServers);
 
-				builder.AddExceptionHandle((ex, c) =>
-				{
-					logHandle(LoggerLevel.Error, ex.ToString());
-				});
+                builder.AddExceptionHandle((ex, c) =>
+                {
+                    if (ex is ObjectDisposedException)
+                        return;
 
+                    logHandle(LoggerLevel.Error, ex.ToString());
+                });
 
-				if (node.DebugPacketIO)
-				{
-					builder.AddSendHandle((c, pid, len, st) =>
-					{
-						logHandle?.Invoke(LoggerLevel.Info, $"[UDP Binding Point] Send {pid}");
-					});
+                builder.AddConnectHandle(client =>
+                {
+                    logHandle?.Invoke(LoggerLevel.Info, $"[UDP Binding Point] Connect new client");
+                });
 
-					builder.AddReceiveHandle((c, pid, len) =>
-					{
-						logHandle?.Invoke(LoggerLevel.Info, $"[UDP Binding Point] Receive {pid}");
-					});
-				}
-			})
-			.Build();
+                builder.AddPacketHandle(1010, (client, data) => logHandle(LoggerLevel.Error, $"asafasfasfasfasfasfsafas"));
 
-		endPoint.Start();
+                if (node.DebugPacketIO)
+                {
+                    builder.AddSendHandle((c, pid, len, st) =>
+                    {
+                        logHandle?.Invoke(LoggerLevel.Info, $"[UDP Binding Point] Send {pid}");
+                    });
 
-		NSLEndPoint endPointConnectionUrl = default;
+                    builder.AddReceiveHandle((c, pid, len) =>
+                    {
+                        logHandle?.Invoke(LoggerLevel.Info, $"[UDP Binding Point] Receive {pid}");
+                    });
+                }
+            })
+            .Build();
 
-		if (endPoint?.StunInformation != null)
-			endPointConnectionUrl = NSLEndPoint.FromIPAddress(
-				NSLEndPoint.Type.UDP,
-				endPoint.StunInformation.PublicEndPoint.Address,
-				endPoint.StunInformation.PublicEndPoint.Port
-				);
+        endPoint.Start();
 
-		if (getEndPoint != null)
-			getEndPoint(endPointConnectionUrl);
+        NSLEndPoint endPointConnectionUrl = default;
 
-		return endPoint;
-	}
+        if (endPoint?.StunInformation != null)
+            endPointConnectionUrl = NSLEndPoint.FromIPAddress(
+                NSLEndPoint.Type.UDP,
+                endPoint.StunInformation.PublicEndPoint.Address,
+                endPoint.StunInformation.PublicEndPoint.Port
+                );
+
+        if (getEndPoint != null)
+            getEndPoint(endPointConnectionUrl);
+
+        return endPoint;
+    }
 }
