@@ -21,11 +21,11 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
     public NodeRoomClient roomClient;
 
 
-    public event Action<PlayerInfo> OnNodeConnect = player => { };
+    public event Action<NodeInfo> OnNodeConnect = node => { };
 
     public event Action OnRoomReady = () => { };
 
-    public int TotalPlayerCount { get; private set; }
+    public int TotalNodeCount { get; private set; }
 
     private NodeSessionStartupModel roomStartInfo;
 
@@ -205,7 +205,7 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
 
         roomClient.OnRoomStartupInfoReceive += startupInfo =>
         {
-            TotalPlayerCount = startupInfo.GetRoomPlayerCount();
+            TotalNodeCount = startupInfo.GetRoomPlayerCount();
         };
 
         roomClient.OnChangeNodeList = (roomServer, data, instance) =>
@@ -221,13 +221,13 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
                 {
 
                     if (nodeClient.TryConnect(item))
-                        OnNodeConnect(nodeClient.PlayerInfo);
+                        OnNodeConnect(nodeClient.NodeInfo);
                     else
                         throw new Exception($"Cannot connect");
                 }
             }
 
-            OnChangeNodesReady(data.Count(), TotalPlayerCount);
+            OnChangeNodesReady(data.Count(), TotalNodeCount);
         };
 
         return roomClient.Initialize(cancellationToken);
@@ -235,15 +235,15 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
 
     private void roomClient_OnExecute(InputPacketBuffer buffer)
     {
-        Invoke((PlayerInfo)null, buffer);
+        Invoke((NodeInfo)null, buffer);
     }
 
-    private void roomClient_OnTransport(Guid playerId, InputPacketBuffer buffer)
+    private void roomClient_OnTransport(Guid nodeId, InputPacketBuffer buffer)
     {
-        if (!connectedClients.TryGetValue(playerId, out var client))
+        if (!connectedClients.TryGetValue(nodeId, out var client))
             return;
 
-        Invoke(client.PlayerInfo, buffer);
+        Invoke(client.NodeInfo, buffer);
     }
 
     #endregion
@@ -258,7 +258,7 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
         {
             await Task.Delay(100, cancellationToken);
 
-            for (int i = 0; (i < MaxNodesWaitCycle || MaxNodesWaitCycle == 0) && connectedClients.Count < TotalPlayerCount - 1; i++)
+            for (int i = 0; (i < MaxNodesWaitCycle || MaxNodesWaitCycle == 0) && connectedClients.Count < TotalNodeCount - 1; i++)
             {
                 await Task.Delay(200, cancellationToken);
 
@@ -266,7 +266,7 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
             }
 
             if (!valid)
-                valid = await roomClient.SendReady(TotalPlayerCount, connectedClients.Select(x => x.Key));
+                valid = await roomClient.SendReady(TotalNodeCount, connectedClients.Select(x => x.Key));
 
         } while (!Ready);
     }
@@ -378,7 +378,7 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void Invoke(PlayerInfo nodePlayer, InputPacketBuffer buffer)
+    public void Invoke(NodeInfo nodeInfo, InputPacketBuffer buffer)
     {
         var code = buffer.ReadUInt16();
 
@@ -387,7 +387,7 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
         if (handle == null)
             return;
 
-        handle(nodePlayer, buffer);
+        handle(nodeInfo, buffer);
     }
 
     public virtual void Invoke(Action action, InputPacketBuffer buffer)
@@ -408,10 +408,10 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public PlayerInfo GetPlayer(Guid id)
+    public NodeInfo GetNode(Guid id)
     {
         if (connectedClients.TryGetValue(id, out var node))
-            return node.PlayerInfo;
+            return node.NodeInfo;
 
         return null;
     }
@@ -419,12 +419,12 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
     public void SendTo(Guid nodeId, OutputPacketBuffer packet)
     {
         if (connectedClients.TryGetValue(nodeId, out var node))
-            SendTo(node.PlayerInfo, packet);
+            SendTo(node.NodeInfo, packet);
     }
 
-    public void SendTo(PlayerInfo player, OutputPacketBuffer packet, bool disposeOnSend = true)
+    public void SendTo(NodeInfo node, OutputPacketBuffer packet, bool disposeOnSend = true)
     {
-        player.Network.Send(packet, disposeOnSend);
+        node.Network.Send(packet, disposeOnSend);
     }
 
     #endregion
@@ -444,10 +444,10 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
 
         foreach (var item in connectedClients)
         {
-            item.Value.PlayerInfo.Network.Dispose();
+            item.Value.NodeInfo.Network.Dispose();
         }
     }
 
-    public IEnumerable<PlayerInfo> GetNodes()
-        => connectedClients.Values.Select(x => x.PlayerInfo).ToArray();
+    public IEnumerable<NodeInfo> GetNodes()
+        => connectedClients.Values.Select(x => x.NodeInfo).ToArray();
 }

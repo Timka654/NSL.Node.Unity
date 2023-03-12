@@ -9,7 +9,7 @@ public class UDPNodeServerNetworkClient : IServerNetworkClient, IUDPClientWithPi
 {
     public UDPPingPacket<UDPNodeServerNetworkClient> PingPacket { get; }
 
-    public NodeClient Player { get; set; }
+    public NodeClient Node { get; set; }
 
     public UDPNodeServerNetworkClient() : base()
     {

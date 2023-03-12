@@ -20,15 +20,15 @@ using System.Threading.Tasks;
 using UnityEditor.Experimental.GraphView;
 using static UnityEditor.ObjectChangeEventStream;
 
-public class NodeClient : INetworkClient, IPlayerNetwork
+public class NodeClient : INetworkClient, NSL.Node.RoomServer.Shared.Client.Core.INodeNetwork
 {
     public INodeNetwork NodeNetwork { get; }
 
     public string Token => connectionInfo.Token;
 
-    public Guid PlayerId => connectionInfo.NodeId;
+    public Guid NodeId => connectionInfo.NodeId;
 
-    public bool IsLocalNode => roomServer.LocalNodeIdentity == PlayerId;
+    public bool IsLocalNode => roomServer.LocalNodeIdentity == NodeId;
 
     public NodeRoomClient Proxy { get; }
 
@@ -38,7 +38,7 @@ public class NodeClient : INetworkClient, IPlayerNetwork
 
     public event NodeClientStateChangeDelegate OnStateChanged = (nstate, ostate) => { };
 
-    public PlayerInfo PlayerInfo { get; private set; }
+    public NodeInfo NodeInfo { get; private set; }
 
     public NodeClient(
         NodeConnectionInfoModel connectionInfo,
@@ -54,15 +54,15 @@ public class NodeClient : INetworkClient, IPlayerNetwork
         this.logHandle = logHandle;
         Proxy = proxy;
         this.udpBindingPoint = udpBindingPoint;
-        PlayerInfo = new PlayerInfo(this, PlayerId);
+        NodeInfo = new NodeInfo(this, NodeId);
     }
 
-    private void Proxy_OnTransport(Guid playerId, InputPacketBuffer buffer)
+    private void Proxy_OnTransport(Guid nodeId, InputPacketBuffer buffer)
     {
-        if (playerId != PlayerId)
+        if (nodeId != NodeId)
             return;
 
-        NodeNetwork.Invoke(PlayerInfo, buffer);
+        NodeNetwork.Invoke(NodeInfo, buffer);
     }
 
     public bool TryConnect(NodeConnectionInfoModel connectionInfo)
@@ -121,7 +121,7 @@ public class NodeClient : INetworkClient, IPlayerNetwork
     {
         var packet = new OutputPacketBuffer();
 
-        packet.WriteGuid(PlayerId);
+        packet.WriteGuid(NodeId);
 
         build(packet);
 
@@ -155,7 +155,7 @@ public class NodeClient : INetworkClient, IPlayerNetwork
     {
         var packet = new DgramPacket();
 
-        packet.WriteGuid(PlayerId);
+        packet.WriteGuid(NodeId);
 
         build(packet);
 
@@ -183,7 +183,7 @@ public class NodeClient : INetworkClient, IPlayerNetwork
     {
         var client = udpBindingPoint.CreateClientConnection(new System.Net.IPEndPoint(IPAddress.Parse(ip), port));
 
-        client.Data.Player = this;
+        client.Data.Node = this;
 
         udpClient = client;
 
@@ -194,7 +194,7 @@ public class NodeClient : INetworkClient, IPlayerNetwork
     {
         buffer.ReadGuid();
 
-        Proxy_OnTransport(PlayerId, buffer);
+        Proxy_OnTransport(NodeId, buffer);
     }
 
     public override void Dispose()
