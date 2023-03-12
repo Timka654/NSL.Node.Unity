@@ -1,24 +1,13 @@
-using NSL.BuilderExtensions.SocketCore;
-using NSL.BuilderExtensions.UDPClient;
 using NSL.Node.RoomServer.Shared.Client.Core;
 using NSL.Node.RoomServer.Shared.Client.Core.Enums;
-using NSL.SocketCore;
 using NSL.SocketCore.Utils;
 using NSL.SocketCore.Utils.Buffer;
-using NSL.SocketCore.Utils.Logger.Enums;
-using NSL.SocketCore.Utils.SystemPackets;
 using NSL.UDP;
 using NSL.UDP.Client;
-using NSL.UDP.Client.Interface;
 using NSL.UDP.Enums;
-using NSL.UDP.Interface;
 using NSL.Utils;
 using System;
 using System.Net;
-using System.Net.Sockets;
-using System.Threading.Tasks;
-using UnityEditor.Experimental.GraphView;
-using static UnityEditor.ObjectChangeEventStream;
 
 public class NodeClient : INetworkClient, IPlayerNetwork
 {
@@ -55,6 +44,7 @@ public class NodeClient : INetworkClient, IPlayerNetwork
         Proxy = proxy;
         this.udpBindingPoint = udpBindingPoint;
         PlayerInfo = new PlayerInfo(this, PlayerId);
+
     }
 
     private void Proxy_OnTransport(Guid playerId, InputPacketBuffer buffer)

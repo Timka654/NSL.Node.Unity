@@ -450,4 +450,5 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
 
     public IEnumerable<PlayerInfo> GetNodes()
         => connectedClients.Values.Select(x => x.PlayerInfo).ToArray();
+
 }
