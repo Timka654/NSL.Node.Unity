@@ -10,6 +10,8 @@ using NSL.SocketCore.Utils.SystemPackets;
 using NSL.UDP;
 using NSL.UDP.Client;
 using NSL.UDP.Client.Interface;
+using NSL.UDP.Enums;
+using NSL.UDP.Interface;
 using NSL.Utils;
 using System;
 using System.Net;
@@ -140,48 +142,48 @@ public class NodeClient : INetworkClient, IPlayerNetwork
             packet.Dispose();
     }
 
-    private async void RunPing(UDPClient<UDPNodeServerNetworkClient> client)
+    public void Transport(Action<DgramPacket> build, ushort code, UDPChannelEnum channel = UDPChannelEnum.ReliableOrdered)
     {
-        while (udpClient == client)
+        Transport(p =>
         {
-            var packet = new DgramPacket();
-            packet.PacketId = AliveConnectionPacket.PacketId;
+            p.WriteUInt16(code);
+            build(p);
+        },channel);
+    }
 
-            client.Send(packet);
+    public void Transport(Action<DgramPacket> build, UDPChannelEnum channel = UDPChannelEnum.ReliableOrdered)
+    {
+        var packet = new DgramPacket();
 
-            await Task.Delay(1_000);
+        packet.WriteGuid(PlayerId);
 
-            packet = new DgramPacket();
-            packet.PacketId = 1010;
+        build(packet);
 
-            client.Send(packet);
-        }
+        packet.WithPid(RoomPacketEnum.Transport);
+
+        Send(packet, channel);
+    }
+
+    public void Send(DgramPacket packet, UDPChannelEnum channel = UDPChannelEnum.ReliableOrdered, bool disposeOnSend = true)
+    {
+        packet.Channel = channel;
+
+        if (udpClient != null)
+            udpClient.Send(packet, false);
+
+        if (NodeNetwork.TransportMode.HasFlag(NodeTransportModeEnum.ProxyOnly))
+            
+            Proxy.SendToServers(packet);
+
+        if (disposeOnSend)
+            packet.Dispose();
     }
 
     private bool createUdp(string ip, int port)
     {
-        var bindPoint = udpBindingPoint.GetOptions() as IBindingUDPOptions;
-
-        var client = new UDPClient<UDPNodeServerNetworkClient>(new System.Net.IPEndPoint(IPAddress.Parse(ip), port), udpBindingPoint.GetSocket(), udpBindingPoint.GetServerOptions());
-
-        var node = NodeNetwork as INodeNetworkOptions;
-
-        if (node.DebugPacketIO)
-        {
-            client.OnSendPacket += (c, pid, len, st) =>
-            {
-                logHandle?.Invoke(LoggerLevel.Info, $"[UDP Binding Point ({ip}:{port})] Send {pid}");
-            };
-
-            client.OnReceivePacket += (c, pid, len) =>
-            {
-                logHandle?.Invoke(LoggerLevel.Info, $"[UDP Binding Point({ip}:{port})] Receive {pid}");
-            };
-        }
+        var client = udpBindingPoint.CreateClientConnection(new System.Net.IPEndPoint(IPAddress.Parse(ip), port));
 
         udpClient = client;
-
-        RunPing(client);
 
         return true;
     }
@@ -200,7 +202,7 @@ public class NodeClient : INetworkClient, IPlayerNetwork
         udpClient?.Disconnect();
     }
 
-    private INetworkNode udpClient;
+    private UDPClient<UDPNodeServerNetworkClient> udpClient;
 
     private NodeConnectionInfoModel connectionInfo;
     private readonly RoomNetworkClient roomServer;

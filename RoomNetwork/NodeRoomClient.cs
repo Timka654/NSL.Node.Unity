@@ -159,7 +159,7 @@ public class NodeRoomClient : IDisposable
             if (!item.Value.GetState())
                 continue;
 
-            item.Value.Send(packet, false);
+            ((OutputPacketBuffer)packet).Send(item.Value, false);
         }
     }
 

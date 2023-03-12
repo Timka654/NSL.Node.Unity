@@ -1,6 +1,9 @@
 ﻿using NSL.BuilderExtensions.SocketCore;
 using NSL.BuilderExtensions.UDPServer;
+using NSL.SocketClient;
+using NSL.SocketClient.Utils.SystemPackets;
 using NSL.SocketCore.Utils.Logger.Enums;
+using NSL.SocketServer;
 using NSL.UDP.Client;
 using NSL.UDP.Client.Info;
 using NSL.UDP.Client.Interface;
@@ -9,6 +12,7 @@ using System;
 using System.Collections.Generic;
 using System.Net;
 using UnityEditor.Experimental.GraphView;
+using UnityEditor.PackageManager;
 
 public class BaseUDPNode
 {
@@ -29,13 +33,15 @@ public class BaseUDPNode
         var endPoint = UDPServerEndPointBuilder
             .Create()
             .WithClientProcessor<UDPNodeServerNetworkClient>()
-            .WithOptions<UDPServerOptions<UDPNodeServerNetworkClient>>()
+            .WithOptions<UDPClientOptions<UDPNodeServerNetworkClient>>()
             .WithBindingPoint(new IPEndPoint(IPAddress.Any, 0))
             .WithCode(builder =>
             {
                 var options = builder.GetOptions() as ISTUNOptions;
 
                 options.StunServers.AddRange(STUNServers);
+
+                builder.GetOptions().RegisterUDPPingHandle();
 
                 builder.AddExceptionHandle((ex, c) =>
                 {
@@ -47,21 +53,24 @@ public class BaseUDPNode
 
                 builder.AddConnectHandle(client =>
                 {
-                    logHandle?.Invoke(LoggerLevel.Info, $"[UDP Binding Point] Connect new client");
-                });
+                    if (client == null)
+                        return;
 
-                builder.AddPacketHandle(1010, (client, data) => logHandle(LoggerLevel.Error, $"asafasfasfasfasfasfsafas"));
+                    client.PingPacket.PingPongEnabled = true;
+
+                    logHandle?.Invoke(LoggerLevel.Info, $"[UDP Binding Point] Connect new client {client.Network?.GetRemotePoint()}");
+                });
 
                 if (node.DebugPacketIO)
                 {
-                    builder.AddSendHandle((c, pid, len, st) =>
+                    builder.AddSendHandle((client, pid, len, st) =>
                     {
-                        logHandle?.Invoke(LoggerLevel.Info, $"[UDP Binding Point] Send {pid}");
+                        logHandle?.Invoke(LoggerLevel.Info, $"[UDP Binding Point] Send {pid} to {client?.GetRemotePoint()}");
                     });
 
-                    builder.AddReceiveHandle((c, pid, len) =>
+                    builder.AddReceiveHandle((client, pid, len) =>
                     {
-                        logHandle?.Invoke(LoggerLevel.Info, $"[UDP Binding Point] Receive {pid}");
+                        logHandle?.Invoke(LoggerLevel.Info, $"[UDP Binding Point] Receive {pid} from {client?.GetRemotePoint()}");
                     });
                 }
             })
