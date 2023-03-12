@@ -183,6 +183,8 @@ public class NodeClient : INetworkClient, IPlayerNetwork
     {
         var client = udpBindingPoint.CreateClientConnection(new System.Net.IPEndPoint(IPAddress.Parse(ip), port));
 
+        client.Data.Player = this;
+
         udpClient = client;
 
         return true;

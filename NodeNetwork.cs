@@ -143,7 +143,8 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
             this.udpBindingPoint = BaseUDPNode.CreateUDPEndPoint(
                 this,
                 point => udpEndPoint = point,
-            LogHandle);
+                LogHandle,
+                roomClient_OnTransport);
 
 
             udpEndPointConnectionUrl = udpEndPoint?.ToString();

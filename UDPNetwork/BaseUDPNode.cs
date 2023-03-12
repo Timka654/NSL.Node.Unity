@@ -1,7 +1,9 @@
 ﻿using NSL.BuilderExtensions.SocketCore;
 using NSL.BuilderExtensions.UDPServer;
+using NSL.Node.RoomServer.Shared.Client.Core.Enums;
 using NSL.SocketClient;
 using NSL.SocketClient.Utils.SystemPackets;
+using NSL.SocketCore.Utils.Buffer;
 using NSL.SocketCore.Utils.Logger.Enums;
 using NSL.SocketServer;
 using NSL.UDP.Client;
@@ -28,7 +30,8 @@ public class BaseUDPNode
     public static UDPServer<UDPNodeServerNetworkClient> CreateUDPEndPoint(
         INodeNetworkOptions node,
         Action<NSLEndPoint> getEndPoint,
-        NodeLogDelegate logHandle)
+        NodeLogDelegate logHandle,
+        Action<Guid, InputPacketBuffer> transportHandle)
     {
         var endPoint = UDPServerEndPointBuilder
             .Create()
@@ -73,6 +76,17 @@ public class BaseUDPNode
                         logHandle?.Invoke(LoggerLevel.Info, $"[UDP Binding Point] Receive {pid} from {client?.GetRemotePoint()}");
                     });
                 }
+
+                builder.AddPacketHandle(RoomPacketEnum.Transport, (client, data) =>
+                {
+                    var nid = data.ReadGuid();
+
+                    var len = (int)(data.Lenght - data.Position);
+
+                    var packet = new InputPacketBuffer(data.Read(len));
+
+                    transportHandle(nid, packet);
+                });
             })
             .Build();
 
