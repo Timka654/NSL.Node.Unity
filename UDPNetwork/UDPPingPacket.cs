@@ -1,13 +1,8 @@
-﻿using NSL.SocketCore.Utils.SystemPackets;
-using NSL.SocketServer;
+﻿using NSL.SocketServer;
 using NSL.SocketServer.Utils;
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using UnityEditor.PackageManager;
 
 public class UDPPingPacket<TClient>
     where TClient : IServerNetworkClient, IUDPClientWithPing<TClient>
