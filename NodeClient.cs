@@ -1,26 +1,15 @@
-using NSL.BuilderExtensions.SocketCore;
-using NSL.BuilderExtensions.UDPClient;
 using NSL.Node.RoomServer.Shared.Client.Core;
 using NSL.Node.RoomServer.Shared.Client.Core.Enums;
-using NSL.SocketCore;
 using NSL.SocketCore.Utils;
 using NSL.SocketCore.Utils.Buffer;
-using NSL.SocketCore.Utils.Logger.Enums;
-using NSL.SocketCore.Utils.SystemPackets;
 using NSL.UDP;
 using NSL.UDP.Client;
-using NSL.UDP.Client.Interface;
 using NSL.UDP.Enums;
-using NSL.UDP.Interface;
 using NSL.Utils;
 using System;
 using System.Net;
-using System.Net.Sockets;
-using System.Threading.Tasks;
-using UnityEditor.Experimental.GraphView;
-using static UnityEditor.ObjectChangeEventStream;
 
-public class NodeClient : INetworkClient, NSL.Node.RoomServer.Shared.Client.Core.INodeNetwork
+public class NodeClient : INetworkClient, INodeClientNetwork
 {
     public INodeNetwork NodeNetwork { get; }
 
@@ -28,7 +17,7 @@ public class NodeClient : INetworkClient, NSL.Node.RoomServer.Shared.Client.Core
 
     public Guid NodeId => connectionInfo.NodeId;
 
-    public bool IsLocalNode => roomServer.LocalNodeIdentity == NodeId;
+    public bool IsLocalNode => NodeNetwork.LocalNodeId == NodeId;
 
     public NodeRoomClient Proxy { get; }
 
@@ -42,14 +31,12 @@ public class NodeClient : INetworkClient, NSL.Node.RoomServer.Shared.Client.Core
 
     public NodeClient(
         NodeConnectionInfoModel connectionInfo,
-        RoomNetworkClient roomServer,
         INodeNetwork nodeNetwork,
         NodeLogDelegate logHandle,
         NodeRoomClient proxy,
         UDPServer<UDPNodeServerNetworkClient> udpBindingPoint)
     {
         this.connectionInfo = connectionInfo;
-        this.roomServer = roomServer;
         NodeNetwork = nodeNetwork;
         this.logHandle = logHandle;
         Proxy = proxy;
@@ -72,7 +59,7 @@ public class NodeClient : INetworkClient, NSL.Node.RoomServer.Shared.Client.Core
 
         this.connectionInfo = connectionInfo;
 
-        if (roomServer.LocalNodeIdentity == NodeId)
+        if (IsLocalNode)
         {
             State = NodeClientStateEnum.OnlyProxy;
 
@@ -115,61 +102,21 @@ public class NodeClient : INetworkClient, NSL.Node.RoomServer.Shared.Client.Core
         return result;
     }
 
-    public void Transport(Action<OutputPacketBuffer> build, ushort code)
+    public void Send(Action<DgramOutputPacketBuffer> build, ushort code, UDPChannelEnum channel = UDPChannelEnum.ReliableOrdered)
     {
-        Transport(p =>
-        {
-            p.WriteUInt16(code);
-            build(p);
-        });
-    }
-
-    public void Transport(Action<OutputPacketBuffer> build)
-    {
-        if (roomServer.LocalNodeIdentity == NodeId)
-            return;
-
-        var packet = new OutputPacketBuffer();
-
-        packet.WriteGuid(NodeId);
-
-        build(packet);
-
-        packet.WithPid(RoomPacketEnum.Transport);
-
-        Send(packet);
-    }
-
-    public void Send(OutputPacketBuffer packet, bool disposeOnSend = true)
-    {
-        if (roomServer.LocalNodeIdentity == NodeId)
-            return;
-
-        if (udpClient != null)
-            udpClient.Send(packet, false);
-
-        if (NodeNetwork.TransportMode.HasFlag(NodeTransportModeEnum.ProxyOnly))
-            Proxy.SendToServers(packet);
-
-        if (disposeOnSend)
-            packet.Dispose();
-    }
-
-    public void Transport(Action<DgramPacket> build, ushort code, UDPChannelEnum channel = UDPChannelEnum.ReliableOrdered)
-    {
-        Transport(p =>
+        Send(p =>
         {
             p.WriteUInt16(code);
             build(p);
         }, channel);
     }
 
-    public void Transport(Action<DgramPacket> build, UDPChannelEnum channel = UDPChannelEnum.ReliableOrdered)
+    public void Send(Action<DgramOutputPacketBuffer> build, UDPChannelEnum channel = UDPChannelEnum.ReliableOrdered)
     {
-        if (roomServer.LocalNodeIdentity == NodeId)
+        if (IsLocalNode)
             return;
 
-        var packet = new DgramPacket();
+        var packet = new DgramOutputPacketBuffer();
 
         packet.WriteGuid(NodeId);
 
@@ -180,12 +127,45 @@ public class NodeClient : INetworkClient, NSL.Node.RoomServer.Shared.Client.Core
         Send(packet, channel);
     }
 
-    public void Send(DgramPacket packet, UDPChannelEnum channel = UDPChannelEnum.ReliableOrdered, bool disposeOnSend = true)
+    public void Send(Action<DgramOutputPacketBuffer> build, ushort code)
     {
-        if (roomServer.LocalNodeIdentity == NodeId)
+        Send(p =>
+        {
+            p.WriteUInt16(code);
+            build(p);
+        });
+    }
+
+    public void Send(Action<DgramOutputPacketBuffer> build)
+    {
+        if (IsLocalNode)
+            return;
+
+        var packet = new DgramOutputPacketBuffer();
+
+        packet.WriteGuid(NodeId);
+
+        build(packet);
+
+        packet.WithPid(RoomPacketEnum.Transport);
+
+        Send(packet, true);
+    }
+
+    public void Send(DgramOutputPacketBuffer packet, UDPChannelEnum channel = UDPChannelEnum.ReliableOrdered, bool disposeOnSend = true)
+    {
+        if (IsLocalNode)
             return;
 
         packet.Channel = channel;
+
+        Send(packet, disposeOnSend);
+    }
+
+    public void Send(DgramOutputPacketBuffer packet, bool disposeOnSend = true)
+    {
+        if (IsLocalNode)
+            return;
 
         if (udpClient != null)
             udpClient.Send(packet, false);
@@ -225,7 +205,6 @@ public class NodeClient : INetworkClient, NSL.Node.RoomServer.Shared.Client.Core
     private UDPClient<UDPNodeServerNetworkClient> udpClient;
 
     private NodeConnectionInfoModel connectionInfo;
-    private readonly RoomNetworkClient roomServer;
     private readonly NodeLogDelegate logHandle;
     private readonly UDPServer<UDPNodeServerNetworkClient> udpBindingPoint;
 }

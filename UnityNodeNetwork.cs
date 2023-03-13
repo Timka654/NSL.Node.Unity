@@ -3,6 +3,8 @@ using NSL.SocketCore.Utils.Buffer;
 using NSL.SocketCore.Utils.Logger.Enums;
 using NSL.Utils.Unity;
 using System;
+using System.Collections.Generic;
+using UnityEngine;
 
 public class UnityNodeNetwork<TRoomInfo> : NodeNetwork<TRoomInfo>
     where TRoomInfo : GameInfo
@@ -22,6 +24,29 @@ public class UnityNodeNetwork<TRoomInfo> : NodeNetwork<TRoomInfo>
                 UnityEngine.Debug.Log(content);
                 break;
         }
+    }
+
+    public void FillOwner(GameObject obj, Guid nodeId)
+    {
+        var node = GetNode(nodeId);
+
+        if (node == null)
+            throw new KeyNotFoundException($"not found node with {nodeId}");
+
+        foreach (var item in obj.GetComponents<UnityNodeBehaviour>())
+        {
+            item.SetOwner(this, node.Network);
+        }
+    }
+
+    public void SetOwner(UnityNodeBehaviour obj, Guid nodeId)
+    {
+        var node = GetNode(nodeId);
+
+        if (node == null)
+            throw new KeyNotFoundException($"not found node with {nodeId}");
+
+        obj.SetOwner(this, node.Network);
     }
 
     public override void Invoke(Action action, InputPacketBuffer buffer)

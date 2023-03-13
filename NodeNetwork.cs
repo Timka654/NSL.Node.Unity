@@ -2,6 +2,7 @@ using NSL.Node.RoomServer.Shared.Client.Core;
 using NSL.Node.RoomServer.Shared.Client.Core.Enums;
 using NSL.SocketCore.Utils.Buffer;
 using NSL.SocketCore.Utils.Logger.Enums;
+using NSL.UDP;
 using NSL.UDP.Client;
 using NSL.Utils;
 using Open.Nat;
@@ -12,6 +13,8 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
+using UnityEngine.Networking.Types;
+using static UnityEditor.ObjectChangeEventStream;
 
 public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
     where TRoomInfo : GameInfo
@@ -219,11 +222,10 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
                 if (cancellationToken.IsCancellationRequested)
                     return;
 
-                var nodeClient = connectedClients.GetOrAdd(item.NodeId, id => new NodeClient(item, roomServer, this, LogHandle, instance, udpBindingPoint));
+                var nodeClient = connectedClients.GetOrAdd(item.NodeId, id => new NodeClient(item, this, LogHandle, instance, udpBindingPoint));
 
-                if (nodeClient.State == NodeClientStateEnum.None)
+                if (!nodeClient.IsLocalNode && nodeClient.State == NodeClientStateEnum.None)
                 {
-
                     if (nodeClient.TryConnect(item))
                         OnNodeConnect(nodeClient.NodeInfo);
                     else
@@ -277,69 +279,107 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
 
     #region Transport
 
-    public bool Broadcast(Action<OutputPacketBuffer> builder, ushort code)
+    public void Broadcast(DgramOutputPacketBuffer packet, bool disposeOnSend = true)
+    {
+        Parallel.ForEach(connectedClients, c => { c.Value.Send(packet, packet.Channel, false); });
+
+        if (disposeOnSend)
+            packet.Dispose();
+    }
+    public bool Broadcast(ushort code, Action<DgramOutputPacketBuffer> builder)
     {
         if (!Ready)
             return false;
 
-        Parallel.ForEach(connectedClients, c => { c.Value.Transport(builder, code); });
+        Parallel.ForEach(connectedClients, c => { c.Value.Send(builder, code); });
 
         return true;
     }
 
-    public bool Broadcast(Action<OutputPacketBuffer> builder)
+    public bool Broadcast(Action<DgramOutputPacketBuffer> builder)
     {
         if (!Ready)
             return false;
 
-        Parallel.ForEach(connectedClients, c => { c.Value.Transport(builder); });
+        Parallel.ForEach(connectedClients, c => { c.Value.Send(builder); });
 
         return true;
     }
 
-    public bool SendTo(NodeClient node, Action<OutputPacketBuffer> builder, ushort code)
-    {
-        if (!Ready)
-            return false;
-
-        node.Transport(builder, code);
-
-        return true;
-    }
-
-    public bool SendTo(NodeClient node, Action<OutputPacketBuffer> builder)
-    {
-        if (!Ready)
-            return false;
-
-        node.Transport(builder);
-
-        return true;
-    }
-
-    public bool SendTo(Guid nodeId, Action<OutputPacketBuffer> builder)
+    public bool SendTo(Guid nodeId, DgramOutputPacketBuffer packet, bool disposeOnSend = true)
     {
         if (connectedClients.TryGetValue(nodeId, out var node))
-            SendTo(node, builder);
+            return SendTo(node.NodeInfo, packet, disposeOnSend);
+        else if (disposeOnSend)
+            packet.Dispose();
 
         return false;
     }
 
-    public bool SendTo(Guid nodeId, Action<OutputPacketBuffer> builder, ushort code)
+    public bool SendTo(NodeInfo node, DgramOutputPacketBuffer packet, bool disposeOnSend = true)
+    {
+        node.Network.Send(packet, packet.Channel, disposeOnSend);
+
+        return true;
+    }
+
+    public bool SendTo(NodeClient node, Action<DgramOutputPacketBuffer> builder, ushort code)
+    {
+        if (!Ready)
+            return false;
+
+        node.Send(builder, code);
+
+        return true;
+    }
+
+    public bool SendTo(NodeClient node, Action<DgramOutputPacketBuffer> builder)
+    {
+        if (!Ready)
+            return false;
+
+        node.Send(builder);
+
+        return true;
+    }
+
+    public bool SendTo(Guid nodeId, Action<DgramOutputPacketBuffer> builder)
     {
         if (connectedClients.TryGetValue(nodeId, out var node))
-            SendTo(node, builder, code);
+            return SendTo(node, builder);
 
         return false;
+    }
+
+    public bool SendTo(Guid nodeId, Action<DgramOutputPacketBuffer> builder, ushort code)
+    {
+        if (connectedClients.TryGetValue(nodeId, out var node))
+            return SendTo(node, builder, code);
+
+        return false;
+    }
+
+    public bool SendTo(Guid nodeId, ushort command, Action<DgramOutputPacketBuffer> build)
+    {
+        if (connectedClients.TryGetValue(nodeId, out var node))
+            return SendTo(nodeId, build, command);
+
+        return false;
+    }
+
+    public bool SendTo(NodeInfo node, ushort command, Action<DgramOutputPacketBuffer> build)
+    {
+        node.Network.Send(build, command);
+
+        return true;
     }
 
     #endregion
 
 
-    #region Execute
+    #region SendToServer
 
-
-    public void Execute(ushort command, Action<OutputPacketBuffer> build)
+    public void SendToServer(ushort command, Action<OutputPacketBuffer> build)
     {
         var packet = new OutputPacketBuffer();
 
@@ -349,12 +389,15 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
 
         packet.WithPid(RoomPacketEnum.Execute);
 
-        SendToRoomServer(packet);
+        SendToServer(packet);
     }
 
-    public void SendToRoomServer(OutputPacketBuffer packet)
+    public void SendToServer(OutputPacketBuffer packet, bool disposeOnSend = true)
     {
         roomClient.SendToServers(packet);
+
+        if (disposeOnSend)
+            packet.Dispose();
     }
 
     #endregion
@@ -404,31 +447,28 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
 
     #region IRoomInfo
 
-    public void Broadcast(OutputPacketBuffer packet)
+    public DgramOutputPacketBuffer CreateSendToPacket(ushort command)
     {
-        Parallel.ForEach(connectedClients, c => { c.Value.Send(packet, false); });
+        var packet = new DgramOutputPacketBuffer
+        {
+            PacketId = (ushort)RoomPacketEnum.Transport
+        };
 
-        packet.Dispose();
+        packet.WriteUInt16(command);
+
+        return packet;
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public NodeInfo GetNode(Guid id)
+    public OutputPacketBuffer CreateSendToServerPacket(ushort command)
     {
-        if (connectedClients.TryGetValue(id, out var node))
-            return node.NodeInfo;
+        var packet = new OutputPacketBuffer
+        {
+            PacketId = (ushort)RoomPacketEnum.Execute
+        };
 
-        return null;
-    }
+        packet.WriteUInt16(command);
 
-    public void SendTo(Guid nodeId, OutputPacketBuffer packet)
-    {
-        if (connectedClients.TryGetValue(nodeId, out var node))
-            SendTo(node.NodeInfo, packet);
-    }
-
-    public void SendTo(NodeInfo node, OutputPacketBuffer packet, bool disposeOnSend = true)
-    {
-        node.Network.Send(packet, disposeOnSend);
+        return packet;
     }
 
     #endregion
@@ -452,6 +492,17 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
         }
     }
 
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public NodeInfo GetNode(Guid id)
+    {
+        if (connectedClients.TryGetValue(id, out var node))
+            return node.NodeInfo;
+
+        return null;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public IEnumerable<NodeInfo> GetNodes()
         => connectedClients.Values.Select(x => x.NodeInfo).ToArray();
 }

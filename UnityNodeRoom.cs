@@ -2,6 +2,7 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using UnityEngine;
 
 public class UnityNodeRoom : UnityNodeRoom<GameInfo> { }
 
@@ -41,6 +42,12 @@ public abstract class UnityNodeRoom<TRoomInfo> : UnityEngine.MonoBehaviour
 
         await NodeNetwork.InitializeAsync(startupInfo, cancellationToken);
     }
+
+    public void FillOwner(GameObject obj, Guid nodeId)
+        => NodeNetwork.FillOwner(obj, nodeId);
+
+    public void SetOwner(UnityNodeBehaviour obj, Guid nodeId)
+        => NodeNetwork.SetOwner(obj, nodeId);
 
     private void OnApplicationQuit()
     {
