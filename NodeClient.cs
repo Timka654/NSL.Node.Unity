@@ -72,6 +72,13 @@ public class NodeClient : INetworkClient, NSL.Node.RoomServer.Shared.Client.Core
 
         this.connectionInfo = connectionInfo;
 
+        if (roomServer.LocalNodeIdentity == NodeId)
+        {
+            State = NodeClientStateEnum.OnlyProxy;
+
+            return true;
+        }
+
         var oldState = State;
 
         if (string.IsNullOrWhiteSpace(EndPoint) || NodeNetwork.TransportMode.Equals(NodeTransportModeEnum.ProxyOnly))
@@ -119,6 +126,9 @@ public class NodeClient : INetworkClient, NSL.Node.RoomServer.Shared.Client.Core
 
     public void Transport(Action<OutputPacketBuffer> build)
     {
+        if (roomServer.LocalNodeIdentity == NodeId)
+            return;
+
         var packet = new OutputPacketBuffer();
 
         packet.WriteGuid(NodeId);
@@ -132,6 +142,9 @@ public class NodeClient : INetworkClient, NSL.Node.RoomServer.Shared.Client.Core
 
     public void Send(OutputPacketBuffer packet, bool disposeOnSend = true)
     {
+        if (roomServer.LocalNodeIdentity == NodeId)
+            return;
+
         if (udpClient != null)
             udpClient.Send(packet, false);
 
@@ -148,11 +161,14 @@ public class NodeClient : INetworkClient, NSL.Node.RoomServer.Shared.Client.Core
         {
             p.WriteUInt16(code);
             build(p);
-        },channel);
+        }, channel);
     }
 
     public void Transport(Action<DgramPacket> build, UDPChannelEnum channel = UDPChannelEnum.ReliableOrdered)
     {
+        if (roomServer.LocalNodeIdentity == NodeId)
+            return;
+
         var packet = new DgramPacket();
 
         packet.WriteGuid(NodeId);
@@ -166,13 +182,15 @@ public class NodeClient : INetworkClient, NSL.Node.RoomServer.Shared.Client.Core
 
     public void Send(DgramPacket packet, UDPChannelEnum channel = UDPChannelEnum.ReliableOrdered, bool disposeOnSend = true)
     {
+        if (roomServer.LocalNodeIdentity == NodeId)
+            return;
+
         packet.Channel = channel;
 
         if (udpClient != null)
             udpClient.Send(packet, false);
 
         if (NodeNetwork.TransportMode.HasFlag(NodeTransportModeEnum.ProxyOnly))
-            
             Proxy.SendToServers(packet);
 
         if (disposeOnSend)

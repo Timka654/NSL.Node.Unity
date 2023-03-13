@@ -65,6 +65,8 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
 
     public TRoomInfo RoomInfo { get; private set; }
 
+    public Guid LocalNodeId { get; private set; }
+
 #if DEBUG
 
     private void DebugOnChangeRoomState(NodeRoomStateEnum state)
@@ -86,6 +88,8 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
         RoomInfo = Activator.CreateInstance(typeof(TRoomInfo), this) as TRoomInfo;
 
         roomStartInfo = startupInfo;
+
+        LocalNodeId = Guid.Parse(roomStartInfo.Token.Split(':').First());
 
         OnChangeRoomState -= OnChangeState;
         OnChangeRoomState += OnChangeState;
@@ -205,7 +209,7 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
 
         roomClient.OnRoomStartupInfoReceive += startupInfo =>
         {
-            TotalNodeCount = startupInfo.GetRoomPlayerCount();
+            TotalNodeCount = startupInfo.GetRoomNodeCount();
         };
 
         roomClient.OnChangeNodeList = (roomServer, data, instance) =>
