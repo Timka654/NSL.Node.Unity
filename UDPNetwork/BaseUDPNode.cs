@@ -76,11 +76,7 @@ public class BaseUDPNode
                 {
                     var nid = data.ReadGuid(); // from node
 
-                    var len = (int)(data.Lenght - data.Position);
-
-                    var packet = new InputPacketBuffer(data.Read(len));
-
-                    transportHandle(nid, packet);
+                    transportHandle(nid, data);
                 });
 
                 builder.AddPacketHandle(RoomPacketEnum.Transport, (client, data) =>
