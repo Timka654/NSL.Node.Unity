@@ -117,7 +117,7 @@ public class NodeClient : INetworkClient, INodeClientNetwork
         if (disposeOnSend)
             packet.Dispose();
     }
-    public void SendBroadcast(Action<DgramOutputPacketBuffer> build,  UDPChannelEnum channel = UDPChannelEnum.ReliableOrdered)
+    public void SendBroadcast(Action<DgramOutputPacketBuffer> build, UDPChannelEnum channel = UDPChannelEnum.ReliableOrdered)
     {
         var packet = new DgramOutputPacketBuffer();
 
@@ -138,7 +138,7 @@ public class NodeClient : INetworkClient, INodeClientNetwork
     }
 
 
-    public void Send(Action<DgramOutputPacketBuffer> build, ushort code, UDPChannelEnum channel = UDPChannelEnum.ReliableOrdered)
+    public void Send(ushort code, Action<DgramOutputPacketBuffer> build, UDPChannelEnum channel = UDPChannelEnum.ReliableOrdered)
     {
         Send(p =>
         {
@@ -165,7 +165,7 @@ public class NodeClient : INetworkClient, INodeClientNetwork
         Send(packet, channel);
     }
 
-    public void Send(Action<DgramOutputPacketBuffer> build, ushort code)
+    public void Send(ushort code, Action<DgramOutputPacketBuffer> build)
     {
         Send(p =>
         {

@@ -324,12 +324,12 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
         return true;
     }
 
-    public bool SendTo(NodeClient node, Action<DgramOutputPacketBuffer> builder, ushort code)
+    public bool SendTo(NodeClient node, ushort code, Action<DgramOutputPacketBuffer> builder)
     {
         if (!Ready)
             return false;
 
-        node.Send(builder, code);
+        node.Send(code, builder);
 
         return true;
     }
@@ -352,25 +352,17 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
         return false;
     }
 
-    public bool SendTo(Guid nodeId, Action<DgramOutputPacketBuffer> builder, ushort code)
-    {
-        if (connectedClients.TryGetValue(nodeId, out var node))
-            return SendTo(node, builder, code);
-
-        return false;
-    }
-
     public bool SendTo(Guid nodeId, ushort command, Action<DgramOutputPacketBuffer> build)
     {
         if (connectedClients.TryGetValue(nodeId, out var node))
-            return SendTo(nodeId, build, command);
+            return SendTo(node, command, build);
 
         return false;
     }
 
     public bool SendTo(NodeInfo node, ushort command, Action<DgramOutputPacketBuffer> build)
     {
-        node.Network.Send(build, command);
+        node.Network.Send(command, build);
 
         return true;
     }
