@@ -44,14 +44,6 @@ public class NodeClient : INetworkClient, INodeClientNetwork
         NodeInfo = new NodeInfo(this, NodeId);
     }
 
-    private void Proxy_OnTransport(Guid nodeId, InputPacketBuffer buffer)
-    {
-        if (nodeId != NodeId)
-            return;
-
-        NodeNetwork.Invoke(NodeInfo, buffer);
-    }
-
     public bool TryConnect(NodeConnectionInfoModel connectionInfo)
     {
         if (State != NodeClientStateEnum.None && EndPoint.Equals(connectionInfo.EndPoint))
@@ -102,6 +94,50 @@ public class NodeClient : INetworkClient, INodeClientNetwork
         return result;
     }
 
+    public void SendBroadcast(DgramOutputPacketBuffer packet, UDPChannelEnum channel = UDPChannelEnum.ReliableOrdered, bool disposeOnSend = true)
+    {
+        if (IsLocalNode)
+            return;
+
+        packet.Channel = channel;
+
+        SendBroadcast(packet, disposeOnSend);
+    }
+
+    public void SendBroadcast(DgramOutputPacketBuffer packet, bool disposeOnSend = true)
+    {
+        if (IsLocalNode)
+            return;
+
+        packet.PacketId = (ushort)RoomPacketEnum.Broadcast;
+
+        if (udpClient != null)
+            udpClient.Send(packet, false);
+
+        if (disposeOnSend)
+            packet.Dispose();
+    }
+    public void SendBroadcast(Action<DgramOutputPacketBuffer> build,  UDPChannelEnum channel = UDPChannelEnum.ReliableOrdered)
+    {
+        var packet = new DgramOutputPacketBuffer();
+
+        packet.WriteGuid(NodeNetwork.LocalNodeId);
+
+        build(packet);
+
+        SendBroadcast(packet, channel);
+    }
+
+    public void SendBroadcast(Action<DgramOutputPacketBuffer> build, ushort code, UDPChannelEnum channel = UDPChannelEnum.ReliableOrdered)
+    {
+        SendBroadcast(p =>
+        {
+            p.WriteUInt16(code);
+            build(p);
+        }, channel);
+    }
+
+
     public void Send(Action<DgramOutputPacketBuffer> build, ushort code, UDPChannelEnum channel = UDPChannelEnum.ReliableOrdered)
     {
         Send(p =>
@@ -119,6 +155,8 @@ public class NodeClient : INetworkClient, INodeClientNetwork
         var packet = new DgramOutputPacketBuffer();
 
         packet.WriteGuid(NodeId);
+
+        packet.WriteGuid(NodeNetwork.LocalNodeId);
 
         build(packet);
 
@@ -144,6 +182,8 @@ public class NodeClient : INetworkClient, INodeClientNetwork
         var packet = new DgramOutputPacketBuffer();
 
         packet.WriteGuid(NodeId);
+
+        packet.WriteGuid(NodeNetwork.LocalNodeId);
 
         build(packet);
 
@@ -186,13 +226,6 @@ public class NodeClient : INetworkClient, INodeClientNetwork
         udpClient = client;
 
         return true;
-    }
-
-    private void OnReceiveTransportHandle(NodeNetworkClient client, InputPacketBuffer buffer)
-    {
-        buffer.ReadGuid();
-
-        Proxy_OnTransport(NodeId, buffer);
     }
 
     public override void Dispose()

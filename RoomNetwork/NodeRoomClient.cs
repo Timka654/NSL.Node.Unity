@@ -206,7 +206,9 @@ public class NodeRoomClient : IDisposable
 
     private void OnTransportReceive(RoomNetworkClient client, InputPacketBuffer data)
     {
-        var nid = data.ReadGuid();
+        data.ReadGuid(); // local node
+
+        var nid = data.ReadGuid(); // from node
 
         var len = (int)(data.Lenght - data.Position);
 

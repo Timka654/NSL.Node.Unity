@@ -281,17 +281,18 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
 
     public void Broadcast(DgramOutputPacketBuffer packet, bool disposeOnSend = true)
     {
-        Parallel.ForEach(connectedClients, c => { c.Value.Send(packet, packet.Channel, false); });
+        Parallel.ForEach(connectedClients, c => { c.Value.SendBroadcast(packet, packet.Channel, false); });
 
         if (disposeOnSend)
             packet.Dispose();
     }
+
     public bool Broadcast(ushort code, Action<DgramOutputPacketBuffer> builder)
     {
         if (!Ready)
             return false;
 
-        Parallel.ForEach(connectedClients, c => { c.Value.Send(builder, code); });
+        Parallel.ForEach(connectedClients, c => { c.Value.SendBroadcast(builder, code); });
 
         return true;
     }
@@ -301,7 +302,7 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
         if (!Ready)
             return false;
 
-        Parallel.ForEach(connectedClients, c => { c.Value.Send(builder); });
+        Parallel.ForEach(connectedClients, c => { c.Value.SendBroadcast(builder); });
 
         return true;
     }
