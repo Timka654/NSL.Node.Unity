@@ -4,6 +4,7 @@ using NSL.SocketCore.Utils.Buffer;
 using NSL.SocketCore.Utils.Logger.Enums;
 using NSL.UDP;
 using NSL.UDP.Client;
+using NSL.UDP.Enums;
 using NSL.Utils;
 using Open.Nat;
 using System;
@@ -279,6 +280,7 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
 
     #region Transport
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void Broadcast(DgramOutputPacketBuffer packet, bool disposeOnSend = true)
     {
         Parallel.ForEach(connectedClients, c => { c.Value.SendBroadcast(packet, packet.Channel, false); });
@@ -287,6 +289,16 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
             packet.Dispose();
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public void Broadcast(DgramOutputPacketBuffer packet, UDPChannelEnum channel, bool disposeOnSend = true)
+    {
+        Parallel.ForEach(connectedClients, c => { c.Value.SendBroadcast(packet, channel, false); });
+
+        if (disposeOnSend)
+            packet.Dispose();
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool Broadcast(ushort code, Action<DgramOutputPacketBuffer> builder)
     {
         if (!Ready)
@@ -297,6 +309,18 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
         return true;
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public bool Broadcast(ushort code, UDPChannelEnum channel, Action<DgramOutputPacketBuffer> builder)
+    {
+        if (!Ready)
+            return false;
+
+        Parallel.ForEach(connectedClients, c => { c.Value.SendBroadcast(builder, code, channel); });
+
+        return true;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool Broadcast(Action<DgramOutputPacketBuffer> builder)
     {
         if (!Ready)
@@ -307,6 +331,18 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
         return true;
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public bool Broadcast(UDPChannelEnum channel, Action<DgramOutputPacketBuffer> builder)
+    {
+        if (!Ready)
+            return false;
+
+        Parallel.ForEach(connectedClients, c => { c.Value.SendBroadcast(builder, channel); });
+
+        return true;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool SendTo(Guid nodeId, DgramOutputPacketBuffer packet, bool disposeOnSend = true)
     {
         if (connectedClients.TryGetValue(nodeId, out var node))
@@ -317,6 +353,18 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
         return false;
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public bool SendTo(Guid nodeId, UDPChannelEnum channel, DgramOutputPacketBuffer packet, bool disposeOnSend = true)
+    {
+        if (connectedClients.TryGetValue(nodeId, out var node))
+            return SendTo(node.NodeInfo, channel, packet, disposeOnSend);
+        else if (disposeOnSend)
+            packet.Dispose();
+
+        return false;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool SendTo(NodeInfo node, DgramOutputPacketBuffer packet, bool disposeOnSend = true)
     {
         node.Network.Send(packet, packet.Channel, disposeOnSend);
@@ -324,6 +372,15 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
         return true;
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public bool SendTo(NodeInfo node, UDPChannelEnum channel, DgramOutputPacketBuffer packet, bool disposeOnSend = true)
+    {
+        node.Network.Send(packet, channel, disposeOnSend);
+
+        return true;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool SendTo(NodeClient node, ushort code, Action<DgramOutputPacketBuffer> builder)
     {
         if (!Ready)
@@ -334,6 +391,18 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
         return true;
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public bool SendTo(NodeClient node, ushort code, UDPChannelEnum channel, Action<DgramOutputPacketBuffer> builder)
+    {
+        if (!Ready)
+            return false;
+
+        node.Send(code, builder, channel);
+
+        return true;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool SendTo(NodeClient node, Action<DgramOutputPacketBuffer> builder)
     {
         if (!Ready)
@@ -344,6 +413,18 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
         return true;
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public bool SendTo(NodeClient node, UDPChannelEnum channel, Action<DgramOutputPacketBuffer> builder)
+    {
+        if (!Ready)
+            return false;
+
+        node.Send(builder, channel);
+
+        return true;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool SendTo(Guid nodeId, Action<DgramOutputPacketBuffer> builder)
     {
         if (connectedClients.TryGetValue(nodeId, out var node))
@@ -352,6 +433,16 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
         return false;
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public bool SendTo(Guid nodeId, UDPChannelEnum channel, Action<DgramOutputPacketBuffer> builder)
+    {
+        if (connectedClients.TryGetValue(nodeId, out var node))
+            return SendTo(node, channel, builder);
+
+        return false;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool SendTo(Guid nodeId, ushort command, Action<DgramOutputPacketBuffer> build)
     {
         if (connectedClients.TryGetValue(nodeId, out var node))
@@ -360,9 +451,27 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
         return false;
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public bool SendTo(Guid nodeId, ushort command, UDPChannelEnum channel, Action<DgramOutputPacketBuffer> build)
+    {
+        if (connectedClients.TryGetValue(nodeId, out var node))
+            return SendTo(node, command, channel, build);
+
+        return false;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool SendTo(NodeInfo node, ushort command, Action<DgramOutputPacketBuffer> build)
     {
         node.Network.Send(command, build);
+
+        return true;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public bool SendTo(NodeInfo node, ushort command, UDPChannelEnum channel, Action<DgramOutputPacketBuffer> build)
+    {
+        node.Network.Send(command, build, channel);
 
         return true;
     }

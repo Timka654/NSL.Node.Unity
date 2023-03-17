@@ -100,7 +100,7 @@ public class NodeRoomClient : IDisposable
                     builder.AddPacketHandle(RoomPacketEnum.ChangeNodeList, OnChangeNodeListReceive);
                     builder.AddPacketHandle(RoomPacketEnum.Transport, OnTransportReceive);
                     builder.AddPacketHandle(RoomPacketEnum.Execute, OnExecuteReceive);
-                    builder.AddReceivePacketHandle(RoomPacketEnum.ReadyNodeResult, c => c.PacketWaitBuffer);
+                    builder.AddReceivePacketHandle(RoomPacketEnum.Response, c => c.PacketWaitBuffer);
                     builder.AddPacketHandle(RoomPacketEnum.ReadyRoom, OnRoomReadyReceive);
                     builder.AddPacketHandle(RoomPacketEnum.StartupInfoMessage, OnStartupInfoReceive);
                 })
@@ -128,7 +128,7 @@ public class NodeRoomClient : IDisposable
 
     public async Task<bool> SendReady(int totalCount, IEnumerable<Guid> readyNodes)
     {
-        var p = WaitablePacketBuffer.Create(RoomPacketEnum.ReadyNode);
+        var p = WaitablePacketBuffer.Create(RoomPacketEnum.ReadyNodeRequest);
 
         p.WriteInt32(totalCount);
         p.WriteCollection(readyNodes, i => p.WriteGuid(i));
