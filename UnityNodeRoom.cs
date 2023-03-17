@@ -33,7 +33,7 @@ public abstract class UnityNodeRoom<TRoomInfo> : UnityEngine.MonoBehaviour
     internal async void Initialize(NodeSessionStartupModel startupInfo, CancellationToken cancellationToken = default)
         => await InitializeAsync(startupInfo, cancellationToken);
 
-    internal async Task InitializeAsync(NodeSessionStartupModel startupInfo, CancellationToken cancellationToken = default)
+    internal virtual async Task InitializeAsync(NodeSessionStartupModel startupInfo, CancellationToken cancellationToken = default)
     {
         NodeNetwork.TransportMode = TransportMode;
         NodeNetwork.MaxNodesWaitCycle = MaxNodesWaitCycle;

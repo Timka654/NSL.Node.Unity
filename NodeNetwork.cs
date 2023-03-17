@@ -69,6 +69,11 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
 
     public Guid LocalNodeId { get; private set; }
 
+    public NodeNetwork()
+    {
+        RoomInfo = Activator.CreateInstance(typeof(TRoomInfo), this) as TRoomInfo;
+    }
+
 #if DEBUG
 
     private void DebugOnChangeRoomState(NodeRoomStateEnum state)
@@ -87,7 +92,6 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
         OnChangeRoomState -= DebugOnChangeRoomState;
         OnChangeRoomState += DebugOnChangeRoomState;
 #endif
-        RoomInfo = Activator.CreateInstance(typeof(TRoomInfo), this) as TRoomInfo;
 
         roomStartInfo = startupInfo;
 
