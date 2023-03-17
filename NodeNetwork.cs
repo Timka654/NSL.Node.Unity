@@ -234,6 +234,8 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
                     else
                         throw new Exception($"Cannot connect");
                 }
+                else if(nodeClient.IsLocalNode)
+                    OnNodeConnect(nodeClient.NodeInfo);
             }
 
             OnChangeNodesReady(data.Count(), TotalNodeCount);
