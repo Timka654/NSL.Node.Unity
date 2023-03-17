@@ -235,6 +235,11 @@ public class NodeClient : INetworkClient, INodeClientNetwork
         udpClient?.Disconnect();
     }
 
+    public void SetObjectOwner(INodeOwneredObject _object)
+    {
+        _object.SetOwner(NodeNetwork as IRoomInfo, this);
+    }
+
     private UDPClient<UDPNodeServerNetworkClient> udpClient;
 
     private NodeConnectionInfoModel connectionInfo;

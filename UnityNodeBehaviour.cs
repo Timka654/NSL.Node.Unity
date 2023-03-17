@@ -1,20 +1,20 @@
 using NSL.Node.RoomServer.Shared.Client.Core;
 using UnityEngine;
 
-public class UnityNodeBehaviour : MonoBehaviour
+public class UnityNodeBehaviour : MonoBehaviour, INodeOwneredObject
 {
-    [SerializeField] private INodeNetwork nodeNetwork;
+    [SerializeField] private IRoomInfo nodeRoom;
 
-    [SerializeField] private INodeClientNetwork node;
+    [SerializeField] private INodeClientNetwork nodePlayer;
 
-    public INodeNetwork NodeNetwork => nodeNetwork;
+    public IRoomInfo NodeRoom => nodeRoom;
 
-    public INodeClientNetwork Node => node;
+    public INodeClientNetwork NodePlayer => nodePlayer;
 
-    public void SetOwner(INodeNetwork nodeNetwork, INodeClientNetwork clientNetwork)
+    public void SetOwner(IRoomInfo nodeRoom, INodeClientNetwork nodePlayer)
     {
-        this.nodeNetwork = nodeNetwork;
-        this.node = clientNetwork;
+        this.nodeRoom = nodeRoom;
+        this.nodePlayer = nodePlayer;
     }
 }
 
