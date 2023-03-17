@@ -59,8 +59,8 @@ public class BaseUDPNode
                     logHandle?.Invoke(LoggerLevel.Info, $"[UDP Binding Point] Connect new client {client.Network?.GetRemotePoint()}");
                 });
 
-                if (node.DebugPacketIO)
-                {
+                //if (node.DebugPacketIO)
+                //{
                     builder.AddSendHandle((client, pid, len, st) =>
                     {
                         logHandle?.Invoke(LoggerLevel.Info, $"[UDP Binding Point] Send {pid} to {client?.GetRemotePoint()}");
@@ -70,7 +70,7 @@ public class BaseUDPNode
                     {
                         logHandle?.Invoke(LoggerLevel.Info, $"[UDP Binding Point] Receive {pid} from {client?.GetRemotePoint()}");
                     });
-                }
+                //}
 
                 builder.AddPacketHandle(RoomPacketEnum.Broadcast, (client, data) =>
                 {
