@@ -241,6 +241,7 @@ public class NodeClient : INetworkClient, INodeClientNetwork
     }
 
     private UDPClient<UDPNodeServerNetworkClient> udpClient;
+    public UDPClient<UDPNodeServerNetworkClient> UDPClient => udpClient;
 
     private NodeConnectionInfoModel connectionInfo;
     private readonly NodeLogDelegate logHandle;
