@@ -125,7 +125,7 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
         CurrentState = state;
         Ready = state == NodeRoomStateEnum.Ready;
         if (state == NodeRoomStateEnum.Ready)
-            OnRoomReady();
+            Invoke(() => OnRoomReady());
     }
 
     private async Task<IEnumerable<RoomSessionInfoModel>> initBridges(CancellationToken cancellationToken)
@@ -230,11 +230,11 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
                 if (!nodeClient.IsLocalNode && nodeClient.State == NodeClientStateEnum.None)
                 {
                     if (nodeClient.TryConnect(item))
-                        OnNodeConnect(nodeClient.NodeInfo);
+                        Invoke(() => OnNodeConnect(nodeClient.NodeInfo));
                     else
                         throw new Exception($"Cannot connect");
                 }
-                else if(nodeClient.IsLocalNode)
+                else if (nodeClient.IsLocalNode)
                     OnNodeConnect(nodeClient.NodeInfo);
             }
 
@@ -544,6 +544,11 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
     }
 
     public virtual void Invoke(Action action, InputPacketBuffer buffer)
+    {
+        Invoke(action);
+    }
+
+    public virtual void Invoke(Action action)
     {
         action();
     }

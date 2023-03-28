@@ -53,10 +53,18 @@ public class UnityNodeNetwork<TRoomInfo> : NodeNetwork<TRoomInfo>
     {
         buffer.ManualDisposing = true;
 
-        ThreadHelper.InvokeOnMain(() =>
+        Invoke(() =>
         {
             action();
             buffer.Dispose();
+        });
+    }
+
+    public override void Invoke(Action action)
+    {
+        ThreadHelper.InvokeOnMain(() =>
+        {
+            base.Invoke(action);
         });
     }
 }
