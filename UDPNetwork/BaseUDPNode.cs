@@ -6,6 +6,7 @@ using NSL.SocketCore.Utils.Logger.Enums;
 using NSL.UDP.Client;
 using NSL.UDP.Client.Info;
 using NSL.UDP.Client.Interface;
+using NSL.UDP.Packet;
 using NSL.Utils;
 using System;
 using System.Collections.Generic;

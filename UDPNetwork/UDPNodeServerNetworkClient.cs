@@ -1,4 +1,5 @@
 ﻿using NSL.SocketServer.Utils;
+using NSL.UDP.Packet;
 
 public class UDPNodeServerNetworkClient : IServerNetworkClient, IUDPClientWithPing<UDPNodeServerNetworkClient>
 {
@@ -11,4 +12,9 @@ public class UDPNodeServerNetworkClient : IServerNetworkClient, IUDPClientWithPi
         PingPacket = new UDPPingPacket<UDPNodeServerNetworkClient>(this);
     }
 
+    public override void Dispose()
+    {
+        PingPacket.Dispose();
+        base.Dispose();
+    }
 }
