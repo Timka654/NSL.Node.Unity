@@ -1,6 +1,6 @@
 using NSL.SocketClient;
 
-public class NodeNetworkClient : BaseSocketNetworkClient
+public class NodeUDPNetworkClient : BaseSocketNetworkClient
 {
     public NodeClient NodeClient { get; set; }
 }
