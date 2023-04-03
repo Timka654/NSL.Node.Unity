@@ -8,6 +8,7 @@ using NSL.UDP.Enums;
 using NSL.Utils;
 using System;
 using System.Net;
+using System.Net.Sockets;
 
 public class NodeClient : INetworkClient, INodeClientNetwork
 {
@@ -223,7 +224,7 @@ public class NodeClient : INetworkClient, INodeClientNetwork
 
         client.Data.Node = this;
 
-        udpClient = client;
+        udpClient = new NodeNetworkClient { UDPClient = client };
 
         return true;
     }
@@ -232,7 +233,7 @@ public class NodeClient : INetworkClient, INodeClientNetwork
     {
         base.Dispose();
 
-        udpClient?.Disconnect();
+        udpClient?.UDPClient?.Disconnect();
     }
 
     public void SetObjectOwner(INodeOwneredObject _object)
@@ -240,10 +241,35 @@ public class NodeClient : INetworkClient, INodeClientNetwork
         _object.SetOwner(NodeNetwork as IRoomInfo, this);
     }
 
-    private UDPClient<UDPNodeServerNetworkClient> udpClient;
-    public UDPClient<UDPNodeServerNetworkClient> UDPClient => udpClient;
+    private NodeNetworkClient udpClient;
+    public INodeNetworkClient UDPClient => udpClient;
 
     private NodeConnectionInfoModel connectionInfo;
     private readonly NodeLogDelegate logHandle;
     private readonly UDPServer<UDPNodeServerNetworkClient> udpBindingPoint;
+}
+
+public class NodeNetworkClient :  INodeNetworkClient
+{
+    public UDPClient<UDPNodeServerNetworkClient> UDPClient;
+
+    public int SendBytesRate => UDPClient.SendBytesRate;
+
+    public int ReceiveBytesRate => UDPClient.ReceiveBytesRate;
+
+    public int MINPing => UDPClient.ReliableChannel.MINPing;
+
+    public int AVGPing => UDPClient.ReliableChannel.AVGPing;
+
+    public int MAXPing => UDPClient.ReliableChannel.MAXPing;
+
+    public void Send(DgramOutputPacketBuffer buffer, bool disposeOnSend = true)
+    {
+        UDPClient.Send(buffer, disposeOnSend);
+    }
+
+    public void Disconnect()
+    {
+        UDPClient.Disconnect();
+    }
 }
