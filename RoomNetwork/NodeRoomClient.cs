@@ -128,7 +128,7 @@ public class NodeRoomClient : IDisposable
 
     public async Task<bool> SendReady(int totalCount, IEnumerable<Guid> readyNodes)
     {
-        var p = WaitablePacketBuffer.Create(RoomPacketEnum.ReadyNodeRequest);
+        var p = RequestPacketBuffer.Create(RoomPacketEnum.ReadyNodeRequest);
 
         p.WriteInt32(totalCount);
         p.WriteCollection(readyNodes, i => p.WriteGuid(i));
@@ -137,7 +137,7 @@ public class NodeRoomClient : IDisposable
 
         foreach (var item in connections)
         {
-            await item.Value.Data.PacketWaitBuffer.SendWaitRequest(p, data =>
+            await item.Value.Data.PacketWaitBuffer.SendRequestAsync(p, data =>
             {
                 state = data.ReadBool();
 

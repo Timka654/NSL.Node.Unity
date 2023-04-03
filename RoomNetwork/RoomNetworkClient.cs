@@ -6,7 +6,7 @@ public class RoomNetworkClient : BaseSocketNetworkClient
 {
     public Uri ServerUrl { get; set; }
 
-    public PacketWaitBuffer PacketWaitBuffer { get; }
+    public RequestProcessor PacketWaitBuffer { get; }
 
     public RoomSessionInfoModel SessionInfo { get; set; }
 
@@ -14,7 +14,7 @@ public class RoomNetworkClient : BaseSocketNetworkClient
 
     public RoomNetworkClient()
     {
-        PacketWaitBuffer = new PacketWaitBuffer(this);
+        PacketWaitBuffer = new RequestProcessor(this);
     }
 
     public override void Dispose()
