@@ -25,7 +25,7 @@ public class NodeRoomClient : IDisposable
     private Dictionary<Uri, WSNetworkClient<RoomNetworkClient, WSClientOptions<RoomNetworkClient>>> connections = new Dictionary<Uri, WSNetworkClient<RoomNetworkClient, WSClientOptions<RoomNetworkClient>>>();
 
     public NodeRoomClient(
-        INodeNetworkOptions node, 
+        INodeNetworkOptions node,
         NodeLogDelegate logHandle,
         OnChangeRoomStateDelegate changeStateHandle,
         NodeSessionStartupModel roomStartInfo,
@@ -40,16 +40,15 @@ public class NodeRoomClient : IDisposable
         this.localNodeUdpEndPoint = localNodeUdpEndPoint;
     }
 
-    public Task Initialize(CancellationToken cancellationToken)
+    public async Task Initialize(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
         changeStateHandle(NodeRoomStateEnum.ConnectionTransportServers);
 
-        if (connectToServers(cancellationToken) == default)
+        if (await connectToServers(cancellationToken) == default)
             throw new Exception($"WaitAndRun : Can't find working transport servers");
 
-        return Task.CompletedTask;
     }
 
     private async Task<int> connectToServers(CancellationToken cancellationToken)
@@ -111,11 +110,14 @@ public class NodeRoomClient : IDisposable
 
         foreach (var item in roomServers)
         {
-            if (!await item.Value.ConnectAsync(ConnectionTimeout))
+            logHandle?.Invoke(LoggerLevel.Info, $"Try connect to {item.Key}");
+            if (!await Task.Run(() => item.Value.Connect(ConnectionTimeout)))
             {
                 logHandle?.Invoke(LoggerLevel.Info, $"Cannot connect to {item.Key}");
                 continue;
             }
+
+            logHandle?.Invoke(LoggerLevel.Info, $"Success connect to {item.Key}");
             cancellationToken.ThrowIfCancellationRequested();
 
             connections.Add(item.Key, item.Value);
@@ -168,7 +170,7 @@ public class NodeRoomClient : IDisposable
 
     private void OnStartupInfoReceive(RoomNetworkClient client, InputPacketBuffer data)
     {
-        OnRoomStartupInfoReceive(new NSL.Node.BridgeServer.Shared.NodeRoomStartupInfo(data.ReadCollection(p => new KeyValuePair<string,string>(p.ReadString16(), p.ReadString16()))));
+        OnRoomStartupInfoReceive(new NSL.Node.BridgeServer.Shared.NodeRoomStartupInfo(data.ReadCollection(p => new KeyValuePair<string, string>(p.ReadString16(), p.ReadString16()))));
     }
 
     private void OnSignSessionReceive(RoomNetworkClient client, InputPacketBuffer data)

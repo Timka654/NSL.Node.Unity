@@ -197,7 +197,7 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
 
     #region Room
 
-    private Task initRooms(IEnumerable<RoomSessionInfoModel> connectionPoints, CancellationToken cancellationToken)
+    private async Task initRooms(IEnumerable<RoomSessionInfoModel> connectionPoints, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -241,7 +241,7 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
             OnChangeNodesReady(data.Count(), TotalNodeCount);
         };
 
-        return roomClient.Initialize(cancellationToken);
+        await roomClient.Initialize(cancellationToken);
     }
 
     private void roomClient_OnExecute(InputPacketBuffer buffer)
