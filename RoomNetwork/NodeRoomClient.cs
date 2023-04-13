@@ -86,12 +86,14 @@ public class NodeRoomClient : IDisposable
                     {
                         builder.AddSendHandle((c, pid, len, st) =>
                         {
-                            logHandle?.Invoke(LoggerLevel.Info, $"[Room Server] Send {pid}");
+                            if (pid < ushort.MaxValue - 100)
+                                logHandle?.Invoke(LoggerLevel.Info, $"[Room Server] Send {pid}");
                         });
 
                         builder.AddReceiveHandle((c, pid, len) =>
                         {
-                            logHandle?.Invoke(LoggerLevel.Info, $"[Room Server] Receive {pid}");
+                            if (pid < ushort.MaxValue - 100)
+                                logHandle?.Invoke(LoggerLevel.Info, $"[Room Server] Receive {pid}");
                         });
                     }
 

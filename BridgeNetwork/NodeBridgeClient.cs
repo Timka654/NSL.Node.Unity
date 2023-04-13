@@ -126,12 +126,14 @@ public class NodeBridgeClient : IDisposable
                     {
                         builder.AddSendHandle((c, pid, len, st) =>
                         {
-                            logHandle?.Invoke(LoggerLevel.Info, $"[Bridge Server] Send {pid}");
+                            if (pid < ushort.MaxValue - 100)
+                                logHandle?.Invoke(LoggerLevel.Info, $"[Bridge Server] Send {pid}");
                         });
 
                         builder.AddReceiveHandle((c, pid, len) =>
                         {
-                            logHandle?.Invoke(LoggerLevel.Info, $"[Bridge Server] Receive {pid}");
+                            if (pid < ushort.MaxValue - 100)
+                                logHandle?.Invoke(LoggerLevel.Info, $"[Bridge Server] Receive {pid}");
                         });
                     }
 
