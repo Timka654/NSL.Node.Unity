@@ -6,7 +6,7 @@ using UnityEngine;
 
 public class UnityNodeRoom : UnityNodeRoom<GameInfo> { }
 
-public abstract class UnityNodeRoom<TRoomInfo> : UnityEngine.MonoBehaviour
+public abstract class UnityNodeRoom<TRoomInfo> : UnityEngine.MonoBehaviour, IDisposable
     where TRoomInfo : GameInfo
 {
     /// <summary>
@@ -35,6 +35,9 @@ public abstract class UnityNodeRoom<TRoomInfo> : UnityEngine.MonoBehaviour
 
     internal virtual async Task InitializeAsync(NodeSessionStartupModel startupInfo, CancellationToken cancellationToken = default)
     {
+        if (cancellationToken == default)
+            cancellationToken = (cts = new CancellationTokenSource()).Token;
+
         NodeNetwork.TransportMode = TransportMode;
         NodeNetwork.MaxNodesWaitCycle = MaxNodesWaitCycle;
         NodeNetwork.WaitBridgeDelayMS = WaitBridgeDelayMS;
@@ -49,8 +52,32 @@ public abstract class UnityNodeRoom<TRoomInfo> : UnityEngine.MonoBehaviour
     public void SetOwner(UnityNodeBehaviour obj, Guid nodeId)
         => NodeNetwork.SetOwner(obj, nodeId);
 
+
+    CancellationTokenSource cts = default;
+
+
+    private void OnDestroy()
+    {
+        Dispose();
+    }
+
     private void OnApplicationQuit()
     {
-        NodeNetwork?.Dispose();
+        Dispose();
+    }
+
+    public void Dispose()
+    {
+        try
+        {
+            if (cts != default)
+                cts.Cancel();
+
+            NodeNetwork?.Dispose();
+        }
+        catch
+        {
+
+        }
     }
 }
