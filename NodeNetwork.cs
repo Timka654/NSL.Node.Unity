@@ -540,7 +540,7 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
         if (handle == null)
             return;
 
-        handle(nodeInfo, buffer);
+        Invoke(() => handle(nodeInfo, buffer), buffer);
     }
 
     public virtual void Invoke(Action action, InputPacketBuffer buffer)
