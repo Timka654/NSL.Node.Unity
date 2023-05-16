@@ -626,4 +626,9 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
     {
         throw new NotImplementedException();
     }
+
+    public void Dispose(byte[] data)
+    {
+        throw new NotImplementedException();
+    }
 }
