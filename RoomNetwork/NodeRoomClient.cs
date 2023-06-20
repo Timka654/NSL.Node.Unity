@@ -214,7 +214,7 @@ public class NodeRoomClient : IDisposable
 
         var nid = data.ReadGuid(); // from node
 
-        var len = (int)(data.Lenght - data.Position);
+        var len = (int)(data.Length - data.Position);
 
         var packet = new InputPacketBuffer(data.Read(len));
 
