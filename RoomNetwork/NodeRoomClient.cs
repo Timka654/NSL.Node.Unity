@@ -17,7 +17,7 @@ public class NodeRoomClient : IDisposable
     private readonly NodeLogDelegate logHandle;
     private readonly OnChangeRoomStateDelegate changeStateHandle;
     private readonly NodeSessionStartupModel roomStartInfo;
-    private readonly IEnumerable<RoomSessionInfoModel> connectionPoints;
+    private readonly Dictionary<string, Guid> connectionPoints;
     private readonly string localNodeUdpEndPoint;
 
     public int ConnectionTimeout { get; set; } = 10_000;
@@ -29,7 +29,7 @@ public class NodeRoomClient : IDisposable
         NodeLogDelegate logHandle,
         OnChangeRoomStateDelegate changeStateHandle,
         NodeSessionStartupModel roomStartInfo,
-        IEnumerable<RoomSessionInfoModel> connectionPoints,
+        Dictionary<string, Guid> connectionPoints,
         string localNodeUdpEndPoint)
     {
         this.node = node;
@@ -60,7 +60,7 @@ public class NodeRoomClient : IDisposable
         cancellationToken.ThrowIfCancellationRequested();
 
         var roomServers = connectionPoints.ToDictionary(
-            point => new Uri(point.ConnectionUrl),
+            point => new Uri(point.Key),
             point => WebSocketsClientEndPointBuilder.Create()
                 .WithClientProcessor<RoomNetworkClient>()
                 .WithOptions<WSClientOptions<RoomNetworkClient>>()
@@ -68,16 +68,19 @@ public class NodeRoomClient : IDisposable
                 {
                     builder.AddConnectHandle(client =>
                     {
-                        client.ServerUrl = new Uri(point.ConnectionUrl);
-                        client.SessionInfo = point;
+                        client.ServerUrl = new Uri(point.Key);
 
                         client.PingPongEnabled = true;
 
                         var packet = OutputPacketBuffer.Create(RoomPacketEnum.SignSession);
 
-                        packet.WriteString16(roomStartInfo.Token);
-                        packet.WriteGuid(point.Id);
-                        packet.WriteString16(localNodeUdpEndPoint);
+                        packet.WriteGuid(point.Value);
+
+                        packet.WriteGuid(roomStartInfo.RoomId);
+
+                        packet.WriteString(roomStartInfo.Token);
+
+                        packet.WriteString(localNodeUdpEndPoint);
 
                         client.Network.Send(packet);
                     });
@@ -105,7 +108,7 @@ public class NodeRoomClient : IDisposable
                     builder.AddPacketHandle(RoomPacketEnum.ReadyRoom, OnRoomReadyReceive);
                     builder.AddPacketHandle(RoomPacketEnum.StartupInfoMessage, OnStartupInfoReceive);
                 })
-                .WithUrl(new Uri(point.ConnectionUrl))
+                .WithUrl(new Uri(point.Key))
                 .Build());
 
         cancellationToken.ThrowIfCancellationRequested();
@@ -172,7 +175,7 @@ public class NodeRoomClient : IDisposable
 
     private void OnStartupInfoReceive(RoomNetworkClient client, InputPacketBuffer data)
     {
-        OnRoomStartupInfoReceive(new NSL.Node.BridgeServer.Shared.NodeRoomStartupInfo(data.ReadCollection(p => new KeyValuePair<string, string>(p.ReadString16(), p.ReadString16()))));
+        OnRoomStartupInfoReceive(data.ReadCollection(p => (p.ReadString(), p.ReadString())).ToDictionary(x=>x.Item1, x=>x.Item2));
     }
 
     private void OnSignSessionReceive(RoomNetworkClient client, InputPacketBuffer data)
@@ -180,7 +183,11 @@ public class NodeRoomClient : IDisposable
         var result = data.ReadBool();
 
         if (result)
+        {
             client.RequestServerTimeOffset();
+
+            client.PlayerId = data.ReadGuid();
+        }
         else
         {
             logHandle(LoggerLevel.Error, $"Cannot sign on {nameof(NodeRoomClient)}");
@@ -189,7 +196,7 @@ public class NodeRoomClient : IDisposable
 
     private void OnChangeNodeListReceive(RoomNetworkClient client, InputPacketBuffer data)
     {
-        OnChangeNodeList(client, data.ReadCollection(() => new NodeConnectionInfoModel(data.ReadGuid(), data.ReadString16(), data.ReadString16())), this);
+        OnChangeNodeList(client, data.ReadCollection(() => new NodeConnectionInfoModel(data.ReadGuid(), data.ReadString(), data.ReadString())), this);
     }
 
     private void OnRoomReadyReceive(RoomNetworkClient client, InputPacketBuffer data)

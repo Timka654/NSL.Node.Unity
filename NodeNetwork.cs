@@ -18,8 +18,6 @@ using System.Threading.Tasks;
 public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
     where TRoomInfo : GameInfo
 {
-    public NodeBridgeClient bridgeClient;
-
     public NodeRoomClient roomClient;
 
 
@@ -28,6 +26,8 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
     public event Action OnRoomReady = () => { };
 
     public int TotalNodeCount { get; private set; }
+
+    private bool NeedWaitAll { get; set; }
 
     private NodeSessionStartupModel roomStartInfo;
 
@@ -102,11 +102,9 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
 
         try
         {
-            var connectionPoints = await initBridges(cancellationToken);
-
             await initUDPBindingPoint(cancellationToken);
 
-            await initRooms(connectionPoints, cancellationToken);
+            await initRooms(startupInfo.ConnectionEndPoints, cancellationToken);
 
             await waitNodeConnection(cancellationToken);
 
@@ -126,19 +124,6 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
         Ready = state == NodeRoomStateEnum.Ready;
         if (state == NodeRoomStateEnum.Ready)
             Invoke(() => OnRoomReady());
-    }
-
-    private async Task<IEnumerable<RoomSessionInfoModel>> initBridges(CancellationToken cancellationToken)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-
-        bridgeClient = new NodeBridgeClient(
-            this,
-            LogHandle,
-            OnChangeRoomState,
-            roomStartInfo);
-
-        return await bridgeClient.Initialize(cancellationToken);
     }
 
     private async Task initUDPBindingPoint(CancellationToken cancellationToken)
@@ -197,7 +182,7 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
 
     #region Room
 
-    private async Task initRooms(IEnumerable<RoomSessionInfoModel> connectionPoints, CancellationToken cancellationToken)
+    private async Task initRooms(Dictionary<string, Guid> connectionPoints, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -215,7 +200,8 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
 
         roomClient.OnRoomStartupInfoReceive += startupInfo =>
         {
-            TotalNodeCount = startupInfo.GetRoomNodeCount();
+            NeedWaitAll = bool.Parse(startupInfo["waitAll"]);
+            TotalNodeCount = int.Parse(startupInfo["nodeWaitCount"]);
         };
 
         roomClient.OnChangeNodeList = (roomServer, data, instance) =>
@@ -593,7 +579,6 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
         if (RoomInfo is IDisposable d)
             d.Dispose();
 
-        bridgeClient?.Dispose();
         roomClient?.Dispose();
         udpBindingPoint?.Stop();
 

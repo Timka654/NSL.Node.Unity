@@ -6,6 +6,8 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
+public class UnityNodeNetwork : NodeNetwork<GameInfo> { }
+
 public class UnityNodeNetwork<TRoomInfo> : NodeNetwork<TRoomInfo>
     where TRoomInfo : GameInfo
 {

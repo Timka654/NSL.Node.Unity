@@ -5,13 +5,11 @@ using System.Linq;
 
 public class NodeSessionStartupModel
 {
-    public string Token { get; protected set; }
+    public string Token { get; set; }
 
-    public Guid RoomId { get; protected set; }
+    public Guid RoomId { get; set; }
 
-    public string ServerIdentity { get; protected set; }
-
-    public List<string> ConnectionEndPoints { get; protected set; }
+    public Dictionary<string, Guid> ConnectionEndPoints { get; set; }
 
     public NodeSessionStartupModel() { }
 
@@ -19,10 +17,8 @@ public class NodeSessionStartupModel
     {
         RoomId = buffer.ReadGuid();
 
-        Token = buffer.ReadString16();
+        Token = buffer.ReadString();
 
-        ServerIdentity = buffer.ReadString16();
-
-        ConnectionEndPoints = buffer.ReadCollection(() => buffer.ReadString16()).ToList();
+        ConnectionEndPoints = buffer.ReadCollection(() => (buffer.ReadString(), buffer.ReadGuid())).ToDictionary(x => x.Item1, x => x.Item2);
     }
 }

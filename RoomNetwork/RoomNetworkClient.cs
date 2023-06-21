@@ -8,9 +8,9 @@ public class RoomNetworkClient : BaseSocketNetworkClient
 
     public RequestProcessor PacketWaitBuffer { get; }
 
-    public RoomSessionInfoModel SessionInfo { get; set; }
+    public Guid LocalNodeIdentity => PlayerId;
 
-    public Guid LocalNodeIdentity => SessionInfo.Id;
+    public Guid PlayerId { get; set; }
 
     public RoomNetworkClient()
     {
