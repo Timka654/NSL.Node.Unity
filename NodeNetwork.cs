@@ -23,6 +23,8 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
 
     public event Action<NodeInfo> OnNodeConnect = node => { };
 
+    public event Action<NodeInfo> OnNodeDisconnect = node => { };
+
     public event Action OnRoomReady = () => { };
 
     public int TotalNodeCount { get; private set; }
@@ -68,6 +70,7 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
     public TRoomInfo RoomInfo { get; private set; }
 
     public Guid LocalNodeId { get; private set; }
+    public NodeClient LocalNode { get; private set; }
 
     public NodeNetwork()
     {
@@ -192,7 +195,8 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
             OnChangeRoomState,
             roomStartInfo,
             connectionPoints,
-            udpEndPointConnectionUrl);
+            udpEndPointConnectionUrl,
+            ()=> OnNodeDisconnect(LocalNode.NodeInfo));
 
         roomClient.OnExecute += roomClient_OnExecute;
 
@@ -221,7 +225,10 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
                         throw new Exception($"Cannot connect");
                 }
                 else if (nodeClient.IsLocalNode)
+                {
+                    LocalNode = nodeClient;
                     OnNodeConnect(nodeClient.NodeInfo);
+                }
             }
 
             OnChangeNodesReady(data.Count(), TotalNodeCount);

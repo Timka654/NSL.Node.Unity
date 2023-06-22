@@ -19,6 +19,7 @@ public class NodeRoomClient : IDisposable
     private readonly NodeSessionStartupModel roomStartInfo;
     private readonly Dictionary<string, Guid> connectionPoints;
     private readonly string localNodeUdpEndPoint;
+    private readonly Action onDisconnect;
 
     public int ConnectionTimeout { get; set; } = 10_000;
 
@@ -30,7 +31,8 @@ public class NodeRoomClient : IDisposable
         OnChangeRoomStateDelegate changeStateHandle,
         NodeSessionStartupModel roomStartInfo,
         Dictionary<string, Guid> connectionPoints,
-        string localNodeUdpEndPoint)
+        string localNodeUdpEndPoint,
+        Action onDisconnect)
     {
         this.node = node;
         this.logHandle = logHandle;
@@ -38,6 +40,7 @@ public class NodeRoomClient : IDisposable
         this.roomStartInfo = roomStartInfo;
         this.connectionPoints = connectionPoints;
         this.localNodeUdpEndPoint = localNodeUdpEndPoint;
+        this.onDisconnect = onDisconnect;
     }
 
     public async Task Initialize(CancellationToken cancellationToken)
@@ -83,6 +86,10 @@ public class NodeRoomClient : IDisposable
                         packet.WriteString(localNodeUdpEndPoint);
 
                         client.Network.Send(packet);
+                    });
+
+                    builder.AddDisconnectHandle(client => {
+                        onDisconnect();
                     });
 
                     if (node.DebugPacketIO)
