@@ -608,19 +608,4 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public IEnumerable<NodeInfo> GetNodes()
         => connectedClients.Values.Select(x => x.NodeInfo).ToArray();
-
-    public void SendLobbyFinishRoom(byte[] data = null)
-    {
-        throw new NotImplementedException();
-    }
-
-    public void SendLobbyRoomMessage(byte[] data)
-    {
-        throw new NotImplementedException();
-    }
-
-    public void Dispose(byte[] data)
-    {
-        throw new NotImplementedException();
-    }
 }
