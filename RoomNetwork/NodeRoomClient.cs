@@ -1,15 +1,25 @@
 using NSL.BuilderExtensions.SocketCore;
 using NSL.BuilderExtensions.WebSocketsClient;
+using NSL.Node.Core.Models.Message;
+using NSL.Node.Core.Models.Requests;
+using NSL.Node.Core.Models.Response;
+#if UNITY_WEBGL && !UNITY_EDITOR
+using NSL.BuilderExtensions.WebSocketsClient.Unity;
+#endif
 using NSL.Node.RoomServer.Shared.Client.Core.Enums;
 using NSL.SocketCore.Extensions.Buffer;
 using NSL.SocketCore.Utils.Buffer;
 using NSL.SocketCore.Utils.Logger.Enums;
+using NSL.Utils.Unity;
 using NSL.WebSockets.Client;
 using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using UnityEditor.PackageManager;
+using UnityEngine.LowLevel;
 
 public class NodeRoomClient : IDisposable
 {
@@ -51,7 +61,6 @@ public class NodeRoomClient : IDisposable
 
         if (await connectToServers(cancellationToken) == default)
             throw new Exception($"WaitAndRun : Can't find working transport servers");
-
     }
 
     private async Task<int> connectToServers(CancellationToken cancellationToken)
@@ -66,97 +75,159 @@ public class NodeRoomClient : IDisposable
             point => new Uri(point.Key),
             point => WebSocketsClientEndPointBuilder.Create()
                 .WithClientProcessor<RoomNetworkClient>()
-                .WithOptions<WSClientOptions<RoomNetworkClient>>()
+                .WithOptions()
                 .WithCode(builder =>
                 {
+                    var options = builder.GetCoreOptions();
+
+                    builder.AddConnectHandle(client => client.InitializeObjectBag());
+
+                    options.ConfigureRequestProcessor(RoomPacketEnum.Response);
+
                     builder.AddConnectHandle(client =>
                     {
                         client.ServerUrl = new Uri(point.Key);
 
                         client.PingPongEnabled = true;
 
-                        var packet = OutputPacketBuffer.Create(RoomPacketEnum.SignSession);
-
-                        packet.WriteGuid(point.Value);
-
-                        packet.WriteGuid(roomStartInfo.RoomId);
-
-                        packet.WriteString(roomStartInfo.Token);
-
-                        packet.WriteString(localNodeUdpEndPoint);
-
-                        client.Network.Send(packet);
+                        SendSign(client, point.Value);
                     });
 
-                    builder.AddDisconnectHandle(client => {
-                        onDisconnect();
-                    });
+                    builder.AddDisconnectHandle(client => { onDisconnect(); });
 
                     if (node.DebugPacketIO)
                     {
                         builder.AddSendHandle((c, pid, len, st) =>
                         {
-                            if (pid < ushort.MaxValue - 100)
-                                logHandle?.Invoke(LoggerLevel.Info, $"[Room Server] Send {pid}");
+                            if (!InputPacketBuffer.IsSystemPID(pid))
+                                logHandle?.Invoke(LoggerLevel.Info, $"[Room Server] Send {pid}({Enum.GetName(typeof(RoomPacketEnum), pid)})");
                         });
 
                         builder.AddReceiveHandle((c, pid, len) =>
                         {
-                            if (pid < ushort.MaxValue - 100)
-                                logHandle?.Invoke(LoggerLevel.Info, $"[Room Server] Receive {pid}");
+                            if (!InputPacketBuffer.IsSystemPID(pid))
+                                logHandle?.Invoke(LoggerLevel.Info, $"[Room Server] Receive {pid}({Enum.GetName(typeof(RoomPacketEnum), pid)})");
                         });
                     }
 
-                    builder.AddResponsePacketHandle(RoomPacketEnum.Response, c => c.PacketWaitBuffer);
-                    builder.AddPacketHandle(RoomPacketEnum.SignSessionResult, OnSignSessionReceive);
-                    builder.AddPacketHandle(RoomPacketEnum.ChangeNodeList, OnChangeNodeListReceive);
-                    builder.AddPacketHandle(RoomPacketEnum.Transport, OnTransportReceive);
-                    builder.AddPacketHandle(RoomPacketEnum.Execute, OnExecuteReceive);
-                    builder.AddPacketHandle(RoomPacketEnum.ReadyRoom, OnRoomReadyReceive);
-                    builder.AddPacketHandle(RoomPacketEnum.StartupInfoMessage, OnStartupInfoReceive);
+                    builder.AddPacketHandle(RoomPacketEnum.TransportMessage, OnTransportReceive);
+                    builder.AddPacketHandle(RoomPacketEnum.ExecuteMessage, OnExecuteReceive);
+                    builder.AddPacketHandle(RoomPacketEnum.ReadyRoomMessage, OnRoomReadyReceive);
+
+                    builder.AddPacketHandle(RoomPacketEnum.NodeConnectMessage, OnNodeConnectMessageReceive);
+                    builder.AddPacketHandle(RoomPacketEnum.RoomDestroyMessage, OnNodeRoomDestroyMessageReceive);
+                    builder.AddPacketHandle(RoomPacketEnum.NodeConnectionLostMessage, OnNodeConnectionLostReceive);
+                    builder.AddPacketHandle(RoomPacketEnum.NodeDisconnectMessage, OnNodeDisconnectReceive);
+                    builder.AddPacketHandle(RoomPacketEnum.NodeChangeEndPointMessage, OnNodeChangeEndPointReceive);
                 })
                 .WithUrl(new Uri(point.Key))
-                .Build());
+
+#if UNITY_WEBGL && !UNITY_EDITOR
+                .BuildForWGLPlatform()
+#else
+                .Build()
+#endif
+                );
 
         cancellationToken.ThrowIfCancellationRequested();
 
         foreach (var item in roomServers)
         {
-            logHandle?.Invoke(LoggerLevel.Info, $"Try connect to {item.Key}");
-            if (!await Task.Run(() => item.Value.Connect(ConnectionTimeout)))
-            {
-                logHandle?.Invoke(LoggerLevel.Info, $"Cannot connect to {item.Key}");
-                continue;
-            }
-
-            logHandle?.Invoke(LoggerLevel.Info, $"Success connect to {item.Key}");
-            cancellationToken.ThrowIfCancellationRequested();
-
-            connections.Add(item.Key, item.Value);
+            if (await ConnectToServer(item.Key, item.Value, cancellationToken))
+                connections.Add(item.Key, item.Value);
         }
 
         return connections.Count;
     }
 
+    private async Task<bool> ConnectToServer(Uri url, WSNetworkClient<RoomNetworkClient, WSClientOptions<RoomNetworkClient>> network, CancellationToken cancellationToken)
+    {
+        logHandle?.Invoke(LoggerLevel.Info, $"Try connect to {url}");
+
+        if (!await network.ConnectAsync(ConnectionTimeout))
+        {
+            logHandle?.Invoke(LoggerLevel.Info, $"Cannot connect to {url}");
+
+            return false;
+        }
+
+        logHandle?.Invoke(LoggerLevel.Info, $"Success connect to {url}");
+        cancellationToken.ThrowIfCancellationRequested();
+
+        return true;
+    }
+
     #region Send
+
+    private void SendDisconnectMessage(RoomNetworkClient client)
+    {
+        SendToServers(OutputPacketBuffer.Create(RoomPacketEnum.DisconnectMessage));
+    }
+
+    private void SendNodeChangeEndPointMessage(RoomNetworkClient client, string endPoint)
+    {
+        var packet = OutputPacketBuffer.Create(RoomPacketEnum.DisconnectMessage);
+
+        packet.WriteString(endPoint);
+
+        SendToServers(packet);
+    }
+
+    private void SendSign(RoomNetworkClient client, Guid sessionId)
+    {
+        var requestProcessor = client.GetRequestProcessor();
+
+        var packet = RequestPacketBuffer.Create(RoomPacketEnum.SignSessionRequest);
+
+        new RoomNodeSignInRequestModel()
+        {
+            SessionId = sessionId,
+            RoomId = roomStartInfo.RoomId,
+            Token = roomStartInfo.Token,
+            ConnectionEndPoint = localNodeUdpEndPoint
+        }.WriteFullTo(packet);
+
+        requestProcessor.SendRequest(packet, (data) =>
+        {
+            var result = RoomNodeSignInResponseModel.ReadFullFrom(data);
+
+            if (result.Success)
+            {
+                client.RequestServerTimeOffset();
+
+                client.PlayerId = data.ReadGuid();
+            }
+            else
+            {
+                logHandle(LoggerLevel.Error, $"Cannot sign on {nameof(NodeRoomClient)}({client.ServerUrl} - {sessionId})");
+            }
+
+            OnSignIn(client, result);
+
+            return true;
+        });
+    }
 
     public async Task<bool> SendReady(int totalCount, IEnumerable<Guid> readyNodes)
     {
         var p = RequestPacketBuffer.Create(RoomPacketEnum.ReadyNodeRequest);
 
-        p.WriteInt32(totalCount);
-        p.WriteCollection(readyNodes, i => p.WriteGuid(i));
+        new RoomNodeReadyRequestModel()
+        {
+            ConnectedNodes = readyNodes.ToList(),
+            ConnectedNodesCount = totalCount
+        }.WriteFullTo(p);
 
         bool state = false;
 
         foreach (var item in connections)
         {
-            await item.Value.Data.PacketWaitBuffer.SendRequestAsync(p, data =>
+            await item.Value.Data.GetRequestProcessor().SendRequestAsync(p, data =>
             {
                 state = data.ReadBool();
 
                 return Task.CompletedTask;
-            });
+            }, false);
 
             if (!state)
                 return state;
@@ -179,32 +250,6 @@ public class NodeRoomClient : IDisposable
     #endregion
 
     #region ReceiveHandles
-
-    private void OnStartupInfoReceive(RoomNetworkClient client, InputPacketBuffer data)
-    {
-        OnRoomStartupInfoReceive(data.ReadCollection(p => (p.ReadString(), p.ReadString())).ToDictionary(x=>x.Item1, x=>x.Item2));
-    }
-
-    private void OnSignSessionReceive(RoomNetworkClient client, InputPacketBuffer data)
-    {
-        var result = data.ReadBool();
-
-        if (result)
-        {
-            client.RequestServerTimeOffset();
-
-            client.PlayerId = data.ReadGuid();
-        }
-        else
-        {
-            logHandle(LoggerLevel.Error, $"Cannot sign on {nameof(NodeRoomClient)}");
-        }
-    }
-
-    private void OnChangeNodeListReceive(RoomNetworkClient client, InputPacketBuffer data)
-    {
-        OnChangeNodeList(client, data.ReadCollection(() => new NodeConnectionInfoModel(data.ReadGuid(), data.ReadString(), data.ReadString())), this);
-    }
 
     private void OnRoomReadyReceive(RoomNetworkClient client, InputPacketBuffer data)
     {
@@ -240,15 +285,50 @@ public class NodeRoomClient : IDisposable
         OnExecute(data);
     }
 
+    private void OnNodeConnectMessageReceive(RoomNetworkClient client, InputPacketBuffer data)
+    {
+        OnNodeConnect(this, ConnectNodeMessageModel.ReadFullFrom(data));
+    }
+
+    private void OnNodeRoomDestroyMessageReceive(RoomNetworkClient client, InputPacketBuffer data)
+    {
+        OnRoomDestroy();
+    }
+
+    private void OnNodeConnectionLostReceive(RoomNetworkClient client, InputPacketBuffer data)
+    {
+        OnNodeConnectionLost(data.ReadGuid());
+    }
+
+    private void OnNodeDisconnectReceive(RoomNetworkClient client, InputPacketBuffer data)
+    {
+        OnNodeDisconnect(data.ReadGuid());
+    }
+
+    private void OnNodeChangeEndPointReceive(RoomNetworkClient client, InputPacketBuffer data)
+    {
+        OnNodeChangeEndPoint(data.ReadGuid(), data.ReadString());
+    }
+
     #endregion
 
-    public OnNodeRoomReceiveNodeListDelegate OnChangeNodeList = (roomServer, data, transportClient) => { };
 
     public event OnNodeRoomTransportDelegate OnTransport = (nodeId, buffer) => { };
 
     public event OnNodeRoomExecuteDelegate OnExecute = (buffer) => { };
 
-    public event OnRoomStartupInfoReceiveDelegate OnRoomStartupInfoReceive = (startupInfo) => { };
+    public event OnNodeRoomSignReceiveDelegate OnSignIn = (room, response) => { };
+
+    public event OnRoomNodeConnectedDelegate OnNodeConnect = (instance, message) => { };
+
+    public event OnRoomDestroyDelegate OnRoomDestroy = () => { };
+
+    public event OnRoomNodeConnectionLostDelegate OnNodeConnectionLost = (nodeId) => { };
+
+    public event OnRoomNodeConnectionLostDelegate OnNodeDisconnect = (nodeId) => { };
+
+    public event OnRoomChangeNodeEndPointDelegate OnNodeChangeEndPoint = (nodeId, endPoint) => { };
+
 
     public void Dispose()
     {

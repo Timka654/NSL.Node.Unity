@@ -1,3 +1,4 @@
+using NSL.Node.Core.Models.Message;
 using NSL.Node.RoomServer.Shared.Client.Core;
 using NSL.Node.RoomServer.Shared.Client.Core.Enums;
 using NSL.SocketCore.Utils;
@@ -31,7 +32,7 @@ public class NodeClient : INetworkClient, INodeClientNetwork
     public NodeInfo NodeInfo { get; private set; }
 
     public NodeClient(
-        NodeConnectionInfoModel connectionInfo,
+        ConnectNodeMessageModel connectionInfo,
         INodeNetwork nodeNetwork,
         NodeLogDelegate logHandle,
         NodeRoomClient proxy,
@@ -45,7 +46,7 @@ public class NodeClient : INetworkClient, INodeClientNetwork
         NodeInfo = new NodeInfo(this, NodeId);
     }
 
-    public bool TryConnect(NodeConnectionInfoModel connectionInfo)
+    public bool TryConnect(ConnectNodeMessageModel connectionInfo)
     {
         if (State != NodeClientStateEnum.None && EndPoint.Equals(connectionInfo.EndPoint))
             return true;
@@ -110,7 +111,7 @@ public class NodeClient : INetworkClient, INodeClientNetwork
         if (IsLocalNode)
             return;
 
-        packet.PacketId = (ushort)RoomPacketEnum.Broadcast;
+        packet.PacketId = (ushort)RoomPacketEnum.BroadcastMessage;
 
         if (udpClient != null)
             udpClient.Send(packet, false);
@@ -161,7 +162,7 @@ public class NodeClient : INetworkClient, INodeClientNetwork
 
         build(packet);
 
-        packet.WithPid(RoomPacketEnum.Transport);
+        packet.WithPid(RoomPacketEnum.TransportMessage);
 
         Send(packet, channel);
     }
@@ -188,7 +189,7 @@ public class NodeClient : INetworkClient, INodeClientNetwork
 
         build(packet);
 
-        packet.WithPid(RoomPacketEnum.Transport);
+        packet.WithPid(RoomPacketEnum.TransportMessage);
 
         Send(packet, true);
     }
@@ -244,7 +245,7 @@ public class NodeClient : INetworkClient, INodeClientNetwork
     private NodeNetworkClient udpClient;
     public INodeNetworkClient UDPClient => udpClient;
 
-    private NodeConnectionInfoModel connectionInfo;
+    private ConnectNodeMessageModel connectionInfo;
     private readonly NodeLogDelegate logHandle;
     private readonly UDPServer<UDPNodeServerNetworkClient> udpBindingPoint;
 }

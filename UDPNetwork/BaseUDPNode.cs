@@ -74,14 +74,14 @@ public class BaseUDPNode
                     });
                 }
 
-                builder.AddPacketHandle(RoomPacketEnum.Broadcast, (client, data) =>
+                builder.AddPacketHandle(RoomPacketEnum.BroadcastMessage, (client, data) =>
                 {
                     var nid = data.ReadGuid(); // from node
 
                     transportHandle(nid, data);
                 });
 
-                builder.AddPacketHandle(RoomPacketEnum.Transport, (client, data) =>
+                builder.AddPacketHandle(RoomPacketEnum.TransportMessage, (client, data) =>
                 {
                     data.ReadGuid(); // local node
 

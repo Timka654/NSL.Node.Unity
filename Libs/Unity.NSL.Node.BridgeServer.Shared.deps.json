@@ -1,0 +1,74 @@
+{
+  "runtimeTarget": {
+    "name": ".NETStandard,Version=v2.1/",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETStandard,Version=v2.1": {},
+    ".NETStandard,Version=v2.1/": {
+      "Unity.NSL.Node.BridgeServer.Shared/2023.07.13.2122": {
+        "dependencies": {
+          "Unity.NSL.Generators.BinaryTypeIOGenerator": "2023.7.13.301",
+          "Unity.NSL.Generators.BinaryTypeIOGenerator.Attributes": "2023.7.13.301",
+          "Unity.NSL.SocketCore": "2023.7.13.301"
+        },
+        "runtime": {
+          "Unity.NSL.Node.BridgeServer.Shared.dll": {}
+        }
+      },
+      "Unity.NSL.Generators.BinaryTypeIOGenerator/2023.7.13.301": {
+        "runtime": {
+          "lib/netstandard2.0/Unity.NSL.Generators.BinaryTypeIOGenerator.dll": {
+            "assemblyVersion": "2023.7.13.301",
+            "fileVersion": "2023.7.13.301"
+          }
+        }
+      },
+      "Unity.NSL.Generators.BinaryTypeIOGenerator.Attributes/2023.7.13.301": {
+        "runtime": {
+          "lib/netstandard2.0/Unity.NSL.Generators.BinaryTypeIOGenerator.Attributes.dll": {
+            "assemblyVersion": "2023.7.13.301",
+            "fileVersion": "2023.7.13.301"
+          }
+        }
+      },
+      "Unity.NSL.SocketCore/2023.7.13.301": {
+        "runtime": {
+          "lib/netstandard2.0/Unity.NSL.SocketCore.dll": {
+            "assemblyVersion": "2023.7.13.301",
+            "fileVersion": "2023.7.13.301"
+          }
+        }
+      }
+    }
+  },
+  "libraries": {
+    "Unity.NSL.Node.BridgeServer.Shared/2023.07.13.2122": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "Unity.NSL.Generators.BinaryTypeIOGenerator/2023.7.13.301": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-Dzsz/+Wda1MxSMynJiUtQY6TQY8q/GdFy3cAwwGNuJTP6iXWVuimhiD24rvx8POvFtW1RA+rDbiKjV/qHzxK9g==",
+      "path": "unity.nsl.generators.binarytypeiogenerator/2023.7.13.301",
+      "hashPath": "unity.nsl.generators.binarytypeiogenerator.2023.7.13.301.nupkg.sha512"
+    },
+    "Unity.NSL.Generators.BinaryTypeIOGenerator.Attributes/2023.7.13.301": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-S3BjOzTuqWOVUxLj63uc7UVSAUgV3C+wZLffCitOtunS36EFExBF1aGE6lISb5JCW+KL3beBnZeYgjzYz+81NA==",
+      "path": "unity.nsl.generators.binarytypeiogenerator.attributes/2023.7.13.301",
+      "hashPath": "unity.nsl.generators.binarytypeiogenerator.attributes.2023.7.13.301.nupkg.sha512"
+    },
+    "Unity.NSL.SocketCore/2023.7.13.301": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-4aK3hK6+2TuV2rEiNeGvkAh8aD9VlCHC3LhqyBfPRmoFUiS+Poh1O0YpG1iCWFyHMvOQDYOb9VfgxB2Wm99Qqg==",
+      "path": "unity.nsl.socketcore/2023.7.13.301",
+      "hashPath": "unity.nsl.socketcore.2023.7.13.301.nupkg.sha512"
+    }
+  }
+}

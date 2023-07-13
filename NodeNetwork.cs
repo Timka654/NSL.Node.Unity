@@ -1,3 +1,4 @@
+using NSL.Extensions.Session;
 using NSL.Node.RoomServer.Shared.Client.Core;
 using NSL.Node.RoomServer.Shared.Client.Core.Enums;
 using NSL.SocketCore.Utils.Buffer;
@@ -23,6 +24,8 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
 
     public event Action<NodeInfo> OnNodeConnect = node => { };
 
+    public event Action<NodeInfo> OnNodeConnectionLost = node => { };
+
     public event Action<NodeInfo> OnNodeDisconnect = node => { };
 
     public event Action OnRoomReady = () => { };
@@ -36,6 +39,8 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
     private UDPServer<UDPNodeServerNetworkClient> udpBindingPoint;
 
     private string udpEndPointConnectionUrl;
+
+    public NSLSessionInfo Session { get; private set; }
 
     private ConcurrentDictionary<Guid, NodeClient> connectedClients = new ConcurrentDictionary<Guid, NodeClient>();
 
@@ -63,7 +68,6 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
     };
 
     public event OnChangeNodesReadyDelegate OnChangeNodesReady = (current, total) => { };
-    public event OnChangeNodesReadyDelayDelegate OnChangeNodesReadyDelay = (current, total) => { };
 
     public NodeRoomStateEnum CurrentState { get; private set; }
 
@@ -91,10 +95,10 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
 
     internal async Task InitializeAsync(NodeSessionStartupModel startupInfo, CancellationToken cancellationToken = default)
     {
-#if DEBUG
+        //#if DEBUG
         OnChangeRoomState -= DebugOnChangeRoomState;
         OnChangeRoomState += DebugOnChangeRoomState;
-#endif
+        //#endif
 
         roomStartInfo = startupInfo;
 
@@ -124,7 +128,9 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
     private void OnChangeState(NodeRoomStateEnum state)
     {
         CurrentState = state;
+
         Ready = state == NodeRoomStateEnum.Ready;
+
         if (state == NodeRoomStateEnum.Ready)
             Invoke(() => OnRoomReady());
     }
@@ -189,6 +195,8 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
     {
         cancellationToken.ThrowIfCancellationRequested();
 
+        OnChangeRoomState(NodeRoomStateEnum.ConnectionTransportServers);
+
         roomClient = new NodeRoomClient(
             this,
             LogHandle,
@@ -196,42 +204,47 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
             roomStartInfo,
             connectionPoints,
             udpEndPointConnectionUrl,
-            ()=> OnNodeDisconnect(LocalNode.NodeInfo));
+            () => OnNodeDisconnect(LocalNode?.NodeInfo));
 
         roomClient.OnExecute += roomClient_OnExecute;
 
         roomClient.OnTransport += roomClient_OnTransport;
 
-        roomClient.OnRoomStartupInfoReceive += startupInfo =>
+        roomClient.OnSignIn += (room, signInfo) =>
         {
-            NeedWaitAll = bool.Parse(startupInfo["waitAll"]);
-            TotalNodeCount = int.Parse(startupInfo["nodeWaitCount"]);
-        };
-
-        roomClient.OnChangeNodeList = (roomServer, data, instance) =>
-        {
-            foreach (var item in data)
+            if (!signInfo.Success)
             {
-                if (cancellationToken.IsCancellationRequested)
-                    return;
+                room.Network?.Disconnect();
 
-                var nodeClient = connectedClients.GetOrAdd(item.NodeId, id => new NodeClient(item, this, LogHandle, instance, udpBindingPoint));
-
-                if (!nodeClient.IsLocalNode && nodeClient.State == NodeClientStateEnum.None)
-                {
-                    if (nodeClient.TryConnect(item))
-                        Invoke(() => OnNodeConnect(nodeClient.NodeInfo));
-                    else
-                        throw new Exception($"Cannot connect");
-                }
-                else if (nodeClient.IsLocalNode)
-                {
-                    LocalNode = nodeClient;
-                    OnNodeConnect(nodeClient.NodeInfo);
-                }
+                return;
             }
 
-            OnChangeNodesReady(data.Count(), TotalNodeCount);
+            NeedWaitAll = bool.Parse(signInfo.Options["waitAll"]);
+            TotalNodeCount = int.Parse(signInfo.Options["nodeWaitCount"]);
+        };
+
+        roomClient.OnNodeConnect += (instance, item) =>
+        {
+            if (cancellationToken.IsCancellationRequested)
+                return;
+
+            var nodeClient = connectedClients.GetOrAdd(item.NodeId, id => new NodeClient(item, this, LogHandle, instance, udpBindingPoint));
+
+            if (nodeClient.IsLocalNode)
+            {
+                LocalNode = nodeClient;
+
+                Invoke(() => OnNodeConnect(nodeClient.NodeInfo));
+            }
+            else if (nodeClient.State == NodeClientStateEnum.None)
+            {
+                if (nodeClient.TryConnect(item))
+                    Invoke(() => OnNodeConnect(nodeClient.NodeInfo));
+                else
+                    throw new Exception($"Cannot connect");
+            }
+
+            OnChangeNodesReady(connectedClients.Count(), TotalNodeCount);
         };
 
         await roomClient.Initialize(cancellationToken);
@@ -254,25 +267,19 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
 
     private async Task waitNodeConnection(CancellationToken cancellationToken)
     {
+        if (roomClient == null)
+            return;
+
         OnChangeRoomState(NodeRoomStateEnum.WaitConnections);
 
         bool valid = false;
 
         do
         {
-            await Task.Delay(100, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
 
-            for (int i = 0; (i < MaxNodesWaitCycle || MaxNodesWaitCycle == 0) && connectedClients.Count < TotalNodeCount - 1; i++)
-            {
-                await Task.Delay(200, cancellationToken);
-
-                OnChangeNodesReadyDelay(i + 1, MaxNodesWaitCycle);
-            }
-
-            if (!valid)
-                valid = await roomClient.SendReady(TotalNodeCount, connectedClients.Select(x => x.Key));
-
-        } while (!Ready);
+            valid = await roomClient.SendReady(TotalNodeCount, connectedClients.Select(x => x.Key));
+        } while (!valid);
     }
 
     #region Transport
@@ -486,7 +493,7 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
 
         build(packet);
 
-        packet.WithPid(RoomPacketEnum.Execute);
+        packet.WithPid(RoomPacketEnum.ExecuteMessage);
 
         SendToServer(packet);
     }
@@ -555,7 +562,7 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
     {
         var packet = new DgramOutputPacketBuffer
         {
-            PacketId = (ushort)RoomPacketEnum.Transport
+            PacketId = (ushort)RoomPacketEnum.TransportMessage
         };
 
         packet.WriteUInt16(command);
@@ -567,7 +574,7 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
     {
         var packet = new OutputPacketBuffer
         {
-            PacketId = (ushort)RoomPacketEnum.Execute
+            PacketId = (ushort)RoomPacketEnum.ExecuteMessage
         };
 
         packet.WriteUInt16(command);
@@ -588,6 +595,8 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
 
         roomClient?.Dispose();
         udpBindingPoint?.Stop();
+
+        roomClient = null;
 
         foreach (var item in connectedClients)
         {
