@@ -107,11 +107,11 @@ public class NodeRoomClient : IDisposable
                         });
                     }
 
+                    builder.AddResponsePacketHandle(RoomPacketEnum.Response, c => c.PacketWaitBuffer);
                     builder.AddPacketHandle(RoomPacketEnum.SignSessionResult, OnSignSessionReceive);
                     builder.AddPacketHandle(RoomPacketEnum.ChangeNodeList, OnChangeNodeListReceive);
                     builder.AddPacketHandle(RoomPacketEnum.Transport, OnTransportReceive);
                     builder.AddPacketHandle(RoomPacketEnum.Execute, OnExecuteReceive);
-                    builder.AddReceivePacketHandle(RoomPacketEnum.Response, c => c.PacketWaitBuffer);
                     builder.AddPacketHandle(RoomPacketEnum.ReadyRoom, OnRoomReadyReceive);
                     builder.AddPacketHandle(RoomPacketEnum.StartupInfoMessage, OnStartupInfoReceive);
                 })
