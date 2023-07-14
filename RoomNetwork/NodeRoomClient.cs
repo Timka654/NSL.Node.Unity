@@ -1,3 +1,4 @@
+using Cysharp.Threading.Tasks;
 using NSL.BuilderExtensions.SocketCore;
 using NSL.BuilderExtensions.WebSocketsClient;
 using NSL.Node.Core.Models.Message;
@@ -18,8 +19,6 @@ using System.Drawing;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using UnityEditor.PackageManager;
-using UnityEngine.LowLevel;
 
 public class NodeRoomClient : IDisposable
 {
@@ -93,7 +92,7 @@ public class NodeRoomClient : IDisposable
                         SendSign(client, point.Value);
                     });
 
-                    builder.AddDisconnectHandle(client => { onDisconnect(); });
+                    builder.AddDisconnectHandle(client => { client.Dispose(); onDisconnect(); });
 
                     if (node.DebugPacketIO)
                     {
@@ -222,12 +221,18 @@ public class NodeRoomClient : IDisposable
 
         foreach (var item in connections)
         {
-            await item.Value.Data.GetRequestProcessor().SendRequestAsync(p, data =>
-            {
-                state = data.ReadBool();
+            CancellationTokenSource cts = new CancellationTokenSource();
 
-                return Task.CompletedTask;
+            item.Value.Data.GetRequestProcessor().SendRequest(p, data =>
+            {
+                state = data?.ReadBool() == true;
+
+                cts.Cancel();
+
+                return true;
             }, false);
+
+            try { await UniTask.Delay(10_000, cancellationToken: CancellationTokenSource.CreateLinkedTokenSource(cts.Token, item.Value.Data.LiveConnectionToken).Token); } catch (OperationCanceledException) { }
 
             if (!state)
                 return state;
@@ -335,7 +340,11 @@ public class NodeRoomClient : IDisposable
         foreach (var item in connections)
         {
             if (item.Value.GetState())
+            {
                 item.Value.Disconnect();
+
+                item.Value.Data.Dispose();
+            }
         }
 
         connections.Clear();

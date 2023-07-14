@@ -114,7 +114,6 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
             await initRooms(startupInfo.ConnectionEndPoints, cancellationToken);
 
             await waitNodeConnection(cancellationToken);
-
         }
         catch (TaskCanceledException)
         {
@@ -273,13 +272,14 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
         OnChangeRoomState(NodeRoomStateEnum.WaitConnections);
 
         bool valid = false;
-
+        int i = 0;
         do
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            valid = await roomClient.SendReady(TotalNodeCount, connectedClients.Select(x => x.Key));
-        } while (!valid);
+            valid = await roomClient?.SendReady(TotalNodeCount, connectedClients.Select(x => x.Key)) == true;
+
+        } while (!valid && roomClient != null && ++i < 10); // i for prevent locking
     }
 
     #region Transport
