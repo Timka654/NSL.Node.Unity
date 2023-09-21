@@ -2,5 +2,6 @@
 {
     ConnectionTransportServers,
     WaitConnections,
-    Ready
+    Ready,
+    Invalid
 }

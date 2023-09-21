@@ -34,6 +34,10 @@ public class NodeRoomClient : IDisposable
 
     private Dictionary<Uri, WSNetworkClient<RoomNetworkClient, WSClientOptions<RoomNetworkClient>>> connections = new Dictionary<Uri, WSNetworkClient<RoomNetworkClient, WSClientOptions<RoomNetworkClient>>>();
 
+    public bool AnyServers() => connections.Any();
+
+    public bool AnySignedServers() => connections.Values.Any(x => x.Data?.IsSigned == true);
+
     public NodeRoomClient(
         INodeNetworkOptions node,
         NodeLogDelegate logHandle,
@@ -194,14 +198,25 @@ public class NodeRoomClient : IDisposable
             {
                 client.RequestServerTimeOffset();
 
-                client.PlayerId = data.ReadGuid();
+                client.PlayerId = result.NodeId.Value;
+                client.IsSigned = true;
+
+                logHandle(LoggerLevel.Info, $"Success signed on {client.ServerUrl} - {sessionId}");
+            }
+
+            OnSignIn(client, result);
+
+            if (result.Success)
+            {
+                client.IsSigned = true;
             }
             else
             {
                 logHandle(LoggerLevel.Error, $"Cannot sign on {nameof(NodeRoomClient)}({client.ServerUrl} - {sessionId})");
+                connections.Remove(client.ServerUrl);
+                client.Network.Disconnect();
             }
 
-            OnSignIn(client, result);
 
             return true;
         });
@@ -221,6 +236,9 @@ public class NodeRoomClient : IDisposable
 
         foreach (var item in connections)
         {
+            if (item.Value.Data?.IsSigned != true)
+                continue;
+
             CancellationTokenSource cts = new CancellationTokenSource();
 
             item.Value.Data.GetRequestProcessor().SendRequest(p, data =>

@@ -1,3 +1,4 @@
+using Cysharp.Threading.Tasks;
 using NSL.Extensions.Session;
 using NSL.Node.RoomServer.Shared.Client.Core;
 using NSL.Node.RoomServer.Shared.Client.Core.Enums;
@@ -113,7 +114,10 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
 
             await initRooms(startupInfo.ConnectionEndPoints, cancellationToken);
 
-            await waitNodeConnection(cancellationToken);
+            if (await waitNodeConnection(cancellationToken))
+                OnChangeRoomState(NodeRoomStateEnum.Ready);
+            else
+                OnChangeRoomState(NodeRoomStateEnum.Invalid);
         }
         catch (TaskCanceledException)
         {
@@ -212,11 +216,7 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
         roomClient.OnSignIn += (room, signInfo) =>
         {
             if (!signInfo.Success)
-            {
-                room.Network?.Disconnect();
-
                 return;
-            }
 
             NeedWaitAll = bool.Parse(signInfo.Options["waitAll"]);
             TotalNodeCount = int.Parse(signInfo.Options["nodeWaitCount"]);
@@ -264,10 +264,10 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
 
     #endregion
 
-    private async Task waitNodeConnection(CancellationToken cancellationToken)
+    private async Task<bool> waitNodeConnection(CancellationToken cancellationToken)
     {
         if (roomClient == null)
-            return;
+            return false;
 
         OnChangeRoomState(NodeRoomStateEnum.WaitConnections);
 
@@ -279,7 +279,12 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
 
             valid = await roomClient?.SendReady(TotalNodeCount, connectedClients.Select(x => x.Key)) == true;
 
-        } while (!valid && roomClient != null && ++i < 10); // i for prevent locking
+            if(valid == false)
+                try { await UniTask.Delay(2_000, cancellationToken: cancellationToken); } catch (OperationCanceledException) { }
+
+        } while (!valid && roomClient != null && roomClient.AnyServers() && ++i < 10); // i for prevent locking
+
+        return roomClient?.AnySignedServers() == true;
     }
 
     #region Transport

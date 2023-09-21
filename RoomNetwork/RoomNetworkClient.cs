@@ -15,6 +15,8 @@ public class RoomNetworkClient : BaseSocketNetworkClient
 
     public CancellationToken LiveConnectionToken => LiveConnectionCTS.Token;
 
+    public bool IsSigned { get; set; }
+
     public override void Dispose()
     {
         base.Dispose();
