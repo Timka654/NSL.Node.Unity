@@ -28,7 +28,7 @@ public abstract class UnityNodeRoom<TRoomInfo> : UnityEngine.MonoBehaviour, IDis
 
     public bool DebugPacketIO = true;
 
-    public UnityNodeNetwork<TRoomInfo> NodeNetwork { get; } = new UnityNodeNetwork<TRoomInfo>();
+    public UnityNodeNetwork NodeNetwork { get; } = new UnityNodeNetwork();
 
     internal async void Initialize(NodeSessionStartupModel startupInfo, CancellationToken cancellationToken = default)
         => await InitializeAsync(startupInfo, cancellationToken);

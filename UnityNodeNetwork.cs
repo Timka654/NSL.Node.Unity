@@ -1,15 +1,15 @@
-﻿using NSL.Node.RoomServer.Shared.Client.Core;
+﻿using Cysharp.Threading.Tasks;
+using NSL.Node.RoomServer.Shared.Client.Core;
 using NSL.SocketCore.Utils.Buffer;
 using NSL.SocketCore.Utils.Logger.Enums;
 using NSL.Utils.Unity;
 using System;
 using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 using UnityEngine;
 
-public class UnityNodeNetwork : NodeNetwork<GameInfo> { }
-
-public class UnityNodeNetwork<TRoomInfo> : NodeNetwork<TRoomInfo>
-    where TRoomInfo : GameInfo
+public class UnityNodeNetwork : NodeNetwork
 {
     protected override void LogHandle(LoggerLevel level, string content)
     {
@@ -26,6 +26,11 @@ public class UnityNodeNetwork<TRoomInfo> : NodeNetwork<TRoomInfo>
                 UnityEngine.Debug.Log(content);
                 break;
         }
+    }
+
+    protected override async Task DelayHandle(int milliseconds, CancellationToken cancellationToken, bool _throw = true)
+    {
+        try { await UniTask.Delay(milliseconds, cancellationToken: cancellationToken); } catch (OperationCanceledException) { if (_throw) throw; }
     }
 
     public void FillOwner(GameObject obj, Guid nodeId)

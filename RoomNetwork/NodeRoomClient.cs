@@ -60,8 +60,6 @@ public class NodeRoomClient : IDisposable
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        changeStateHandle(NodeRoomStateEnum.ConnectionTransportServers);
-
         if (await connectToServers(cancellationToken) == default)
             throw new Exception($"WaitAndRun : Can't find working transport servers");
     }
@@ -222,7 +220,7 @@ public class NodeRoomClient : IDisposable
         });
     }
 
-    public async Task<bool> SendReady(int totalCount, IEnumerable<Guid> readyNodes)
+    public async Task<bool> SendReady(int totalCount, IEnumerable<Guid> readyNodes, Func<int, CancellationToken, bool, Task> delayHandle)
     {
         var p = RequestPacketBuffer.Create(RoomPacketEnum.ReadyNodeRequest);
 
@@ -250,7 +248,7 @@ public class NodeRoomClient : IDisposable
                 return true;
             }, false);
 
-            try { await UniTask.Delay(10_000, cancellationToken: CancellationTokenSource.CreateLinkedTokenSource(cts.Token, item.Value.Data.LiveConnectionToken).Token); } catch (OperationCanceledException) { }
+            await delayHandle(4_000, CancellationTokenSource.CreateLinkedTokenSource(cts.Token, item.Value.Data.LiveConnectionToken).Token, false);
 
             if (!state)
                 return state;

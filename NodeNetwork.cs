@@ -17,11 +17,9 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 
-public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
-    where TRoomInfo : GameInfo
+public class NodeNetwork : IRoomInfo, INodeNetwork, IDisposable
 {
     public NodeRoomClient roomClient;
-
 
     public event Action<NodeInfo> OnNodeConnect = node => { };
 
@@ -72,41 +70,22 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
 
     public NodeRoomStateEnum CurrentState { get; private set; }
 
-    public TRoomInfo RoomInfo { get; private set; }
+    public bool Ready { get; private set; }
+
+    public IRoomSession RoomSession { get; private set; }
 
     public Guid LocalNodeId { get; private set; }
+
     public NodeClient LocalNode { get; private set; }
-
-    public NodeNetwork()
-    {
-        RoomInfo = Activator.CreateInstance(typeof(TRoomInfo), this) as TRoomInfo;
-    }
-
-#if DEBUG
-
-    private void DebugOnChangeRoomState(NodeRoomStateEnum state)
-    {
-        LogHandle(LoggerLevel.Debug, $"{nameof(NodeNetwork<TRoomInfo>)} change state -> {state}");
-    }
-
-#endif
 
     internal async void Initialize(NodeSessionStartupModel startupInfo, CancellationToken cancellationToken = default)
         => await InitializeAsync(startupInfo, cancellationToken);
 
     internal async Task InitializeAsync(NodeSessionStartupModel startupInfo, CancellationToken cancellationToken = default)
     {
-        //#if DEBUG
-        OnChangeRoomState -= DebugOnChangeRoomState;
-        OnChangeRoomState += DebugOnChangeRoomState;
-        //#endif
-
         roomStartInfo = startupInfo;
 
         LocalNodeId = Guid.Parse(roomStartInfo.Token.Split(':').First());
-
-        OnChangeRoomState -= OnChangeState;
-        OnChangeRoomState += OnChangeState;
 
         try
         {
@@ -114,28 +93,26 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
 
             await initRooms(startupInfo.ConnectionEndPoints, cancellationToken);
 
-            if (await waitNodeConnection(cancellationToken))
-                OnChangeRoomState(NodeRoomStateEnum.Ready);
-            else
-                OnChangeRoomState(NodeRoomStateEnum.Invalid);
+            if (!await waitNodeConnection(cancellationToken))
+                ChangeState(NodeRoomStateEnum.Invalid);
         }
         catch (TaskCanceledException)
         {
             Dispose();
         }
-
     }
 
-    public bool Ready { get; private set; }
-
-    private void OnChangeState(NodeRoomStateEnum state)
+    /// <summary>
+    /// Set session for dispose handle on dispose network example
+    /// </summary>
+    /// <param name="roomSession"></param>
+    /// <exception cref="Exception"></exception>
+    public void SetSession(IRoomSession roomSession)
     {
-        CurrentState = state;
+        if (CurrentState != NodeRoomStateEnum.None)
+            throw new Exception($"Cannot set room session on {CurrentState}. Need to set this before initialize");
 
-        Ready = state == NodeRoomStateEnum.Ready;
-
-        if (state == NodeRoomStateEnum.Ready)
-            Invoke(() => OnRoomReady());
+        this.RoomSession = roomSession;
     }
 
     private async Task initUDPBindingPoint(CancellationToken cancellationToken)
@@ -192,18 +169,34 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
 
     }
 
+    private void ChangeState(NodeRoomStateEnum state)
+    {
+#if DEBUG
+        LogHandle(LoggerLevel.Debug, $"{nameof(NodeNetwork)} change state -> {state}");
+#endif
+
+        CurrentState = state;
+
+        Ready = state == NodeRoomStateEnum.Ready;
+
+        OnChangeRoomState(state);
+
+        if (state == NodeRoomStateEnum.Ready)
+            Invoke(() => OnRoomReady());
+    }
+
     #region Room
 
     private async Task initRooms(Dictionary<string, Guid> connectionPoints, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        OnChangeRoomState(NodeRoomStateEnum.ConnectionTransportServers);
+        ChangeState(NodeRoomStateEnum.ConnectionTransportServers);
 
         roomClient = new NodeRoomClient(
             this,
             LogHandle,
-            OnChangeRoomState,
+            ChangeState,
             roomStartInfo,
             connectionPoints,
             udpEndPointConnectionUrl,
@@ -269,18 +262,18 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
         if (roomClient == null)
             return false;
 
-        OnChangeRoomState(NodeRoomStateEnum.WaitConnections);
+        ChangeState(NodeRoomStateEnum.WaitConnections);
 
         bool valid = false;
         int i = 0;
         do
         {
             cancellationToken.ThrowIfCancellationRequested();
+             
+            valid = await roomClient?.SendReady(TotalNodeCount, connectedClients.Select(x => x.Key), DelayHandle) == true;
 
-            valid = await roomClient?.SendReady(TotalNodeCount, connectedClients.Select(x => x.Key)) == true;
-
-            if(valid == false)
-                try { await UniTask.Delay(2_000, cancellationToken: cancellationToken); } catch (OperationCanceledException) { }
+            if (valid == false)
+                await DelayHandle(2_000, cancellationToken: cancellationToken);
 
         } while (!valid && roomClient != null && roomClient.AnyServers() && ++i < 10); // i for prevent locking
 
@@ -513,7 +506,6 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
 
     #endregion
 
-
     #region Handle
 
 
@@ -560,7 +552,6 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
 
     #endregion
 
-
     #region IRoomInfo
 
     public DgramOutputPacketBuffer CreateSendToPacket(ushort command)
@@ -593,9 +584,23 @@ public class NodeNetwork<TRoomInfo> : IRoomInfo, INodeNetwork, IDisposable
     {
     }
 
+    /// <summary>
+    /// Delay request handle for implement delay on platforms unsupported <see cref="Task.Delay(int)"/>(and overloads)
+    /// </summary>
+    /// <param name="milliseconds"></param>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
+    protected virtual async Task DelayHandle(int milliseconds, CancellationToken cancellationToken, bool _throw = true)
+    {
+        try { await Task.Delay(2_000, cancellationToken: cancellationToken); } catch (OperationCanceledException) {
+            if (_throw)
+                throw;
+        }
+    }
+
     public void Dispose()
     {
-        if (RoomInfo is IDisposable d)
+        if (RoomSession != null && RoomSession is IDisposable d)
             d.Dispose();
 
         roomClient?.Dispose();
