@@ -7,7 +7,7 @@
   "targets": {
     ".NETStandard,Version=v2.1": {},
     ".NETStandard,Version=v2.1/": {
-      "Unity.NSL.Node.Core/2023.10.02.0153": {
+      "Unity.NSL.Node.Core/2023.10.02.1801": {
         "dependencies": {
           "Unity.NSL.Extensions.Session": "2023.7.26.1030",
           "Unity.NSL.Generators.BinaryTypeIOGenerator": "2023.7.26.1030",
@@ -111,7 +111,7 @@
     }
   },
   "libraries": {
-    "Unity.NSL.Node.Core/2023.10.02.0153": {
+    "Unity.NSL.Node.Core/2023.10.02.1801": {
       "type": "project",
       "serviceable": false,
       "sha512": ""

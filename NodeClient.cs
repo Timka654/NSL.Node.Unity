@@ -242,35 +242,15 @@ public class NodeClient : INetworkClient, INodeClientNetwork
         _object.SetOwner(NodeNetwork as IRoomInfo, this);
     }
 
+    public void Disconnect()
+    {
+        udpClient?.UDPClient?.Disconnect();
+    }
+
     private NodeNetworkClient udpClient;
     public INodeNetworkClient UDPClient => udpClient;
 
     private ConnectNodeMessageModel connectionInfo;
     private readonly NodeLogDelegate logHandle;
     private readonly UDPServer<UDPNodeServerNetworkClient> udpBindingPoint;
-}
-
-public class NodeNetworkClient :  INodeNetworkClient
-{
-    public UDPClient<UDPNodeServerNetworkClient> UDPClient;
-
-    public int SendBytesRate => UDPClient.SendBytesRate;
-
-    public int ReceiveBytesRate => UDPClient.ReceiveBytesRate;
-
-    public int MINPing => UDPClient.ReliableChannel.MINPing;
-
-    public int AVGPing => UDPClient.ReliableChannel.AVGPing;
-
-    public int MAXPing => UDPClient.ReliableChannel.MAXPing;
-
-    public void Send(DgramOutputPacketBuffer buffer, bool disposeOnSend = true)
-    {
-        UDPClient.Send(buffer, disposeOnSend);
-    }
-
-    public void Disconnect()
-    {
-        UDPClient.Disconnect();
-    }
 }
