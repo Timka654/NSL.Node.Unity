@@ -220,6 +220,17 @@ public class NodeRoomClient : IDisposable
         });
     }
 
+    public void SendClientDisconnect()
+    {
+        foreach (var item in connections)
+        {
+            if (item.Value.Data?.IsSigned != true)
+                continue;
+
+            item.Value.Send(OutputPacketBuffer.Create(RoomPacketEnum.DisconnectMessage));
+        }
+    }
+
     public async Task<bool> SendReady(int totalCount, IEnumerable<Guid> readyNodes, Func<int, CancellationToken, bool, Task> delayHandle)
     {
         var p = RequestPacketBuffer.Create(RoomPacketEnum.ReadyNodeRequest);
