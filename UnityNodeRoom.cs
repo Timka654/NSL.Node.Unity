@@ -4,10 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using UnityEngine;
 
-public class UnityNodeRoom : UnityNodeRoom<GameInfo> { }
-
-public abstract class UnityNodeRoom<TRoomInfo> : UnityEngine.MonoBehaviour, IDisposable
-    where TRoomInfo : GameInfo
+public abstract class UnityNodeRoom : UnityEngine.MonoBehaviour, IDisposable
 {
     /// <summary>
     /// Can set how transport all data - P2P, Proxy, All
