@@ -19,6 +19,8 @@ using System.Drawing;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using UnityEngine;
+using ZergRush;
 
 public class NodeRoomClient : IDisposable
 {
@@ -262,8 +264,14 @@ public class NodeRoomClient : IDisposable
             await delayHandle(4_000, CancellationTokenSource.CreateLinkedTokenSource(cts.Token, item.Value.Data.LiveConnectionToken).Token, false);
 
             if (!state)
+            {
+                Debug.LogError($"[Node] ({connections.IndexOf(item)}/{connections.Count}) State for connect to room = false {item.Key}");
                 return state;
+            }
         }
+
+        if (state == false)
+            Debug.LogError($"[Node] not any servers");
 
         return state;
     }
