@@ -65,12 +65,12 @@ public class BaseUDPNode
                 {
                     builder.AddSendHandle((client, pid, len, st) =>
                         {
-                            logHandle?.Invoke(LoggerLevel.Info, $"[UDP Binding Point] Send {pid} to {client?.GetRemotePoint()}");
+                            logHandle?.Invoke(LoggerLevel.Info, $"[UDP Binding Point] Send {pid} to {client?.Network?.GetRemotePoint()}");
                         });
 
                     builder.AddReceiveHandle((client, pid, len) =>
                     {
-                        logHandle?.Invoke(LoggerLevel.Info, $"[UDP Binding Point] Receive {pid} from {client?.GetRemotePoint()}");
+                        logHandle?.Invoke(LoggerLevel.Info, $"[UDP Binding Point] Receive {pid} from {client?.Network?.GetRemotePoint()}");
                     });
                 }
 
