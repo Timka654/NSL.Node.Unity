@@ -67,6 +67,7 @@ public class NodeNetwork : IRoomInfo, INodeNetwork, IDisposable
     };
 
     public event OnChangeNodesReadyDelegate OnChangeNodesReady = (current, total) => { };
+    public event Action<NodeInfo> OnRecoverySession;
 
     public NodeRoomStateEnum CurrentState { get; private set; }
 
@@ -627,4 +628,9 @@ public class NodeNetwork : IRoomInfo, INodeNetwork, IDisposable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public IEnumerable<NodeInfo> GetNodes()
         => connectedClients.Values.Select(x => x.NodeInfo).ToArray();
+
+    public void RecoverySession(NodeInfo node)
+    {
+        throw new NotImplementedException();
+    }
 }
