@@ -25,7 +25,7 @@ public class NodeNetwork : IRoomInfo, INodeNetwork, IDisposable
 
     public event Action<NodeInfo> OnNodeConnectionLost = node => { };
 
-    public event Action<NodeInfo> OnNodeDisconnect = node => { };
+    public event IRoomInfo.OnNodeDisconnectDelegate OnNodeDisconnect = (node, manualDisconnected) => { };
 
     public event Action OnRoomReady = () => { };
 
@@ -201,7 +201,7 @@ public class NodeNetwork : IRoomInfo, INodeNetwork, IDisposable
             roomStartInfo,
             connectionPoints,
             udpEndPointConnectionUrl,
-            () => OnNodeDisconnect(LocalNode?.NodeInfo));
+            () => OnNodeDisconnect(LocalNode?.NodeInfo, false));
 
         roomClient.OnExecute += roomClient_OnExecute;
 
@@ -270,7 +270,7 @@ public class NodeNetwork : IRoomInfo, INodeNetwork, IDisposable
         do
         {
             cancellationToken.ThrowIfCancellationRequested();
-             
+
             valid = await roomClient?.SendReady(TotalNodeCount, connectedClients.Select(x => x.Key), DelayHandle) == true;
 
             if (valid == false)
@@ -593,7 +593,9 @@ public class NodeNetwork : IRoomInfo, INodeNetwork, IDisposable
     /// <returns></returns>
     protected virtual async Task DelayHandle(int milliseconds, CancellationToken cancellationToken, bool _throw = true)
     {
-        try { await Task.Delay(2_000, cancellationToken: cancellationToken); } catch (OperationCanceledException) {
+        try { await Task.Delay(2_000, cancellationToken: cancellationToken); }
+        catch (OperationCanceledException)
+        {
             if (_throw)
                 throw;
         }
