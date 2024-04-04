@@ -372,6 +372,8 @@ public class NodeRoomClient : IDisposable
 
     public void Dispose()
     {
+        SendClientDisconnect();
+
         foreach (var item in connections)
         {
             if (item.Value.GetState())
