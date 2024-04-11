@@ -5,7 +5,7 @@ using System.Threading;
 
 public class RoomNetworkClient : BaseSocketNetworkClient
 {
-    public Uri ServerUrl { get; set; }
+    public string ServerUrl { get; set; }
 
     public Guid LocalNodeIdentity => PlayerId;
 

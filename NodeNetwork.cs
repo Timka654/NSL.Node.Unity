@@ -201,7 +201,8 @@ public class NodeNetwork : IRoomInfo, INodeNetwork, IDisposable
             roomStartInfo,
             connectionPoints,
             udpEndPointConnectionUrl,
-            () => OnNodeDisconnect(LocalNode?.NodeInfo, false));
+            () => OnNodeDisconnect(LocalNode?.NodeInfo, false),
+            () => OnRecoverySession(LocalNode?.NodeInfo));
 
         roomClient.OnExecute += roomClient_OnExecute;
 
