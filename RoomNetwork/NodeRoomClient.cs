@@ -13,6 +13,7 @@ using NSL.BuilderExtensions.WebSocketsClient.Unity;
 using NSL.Node.RoomServer.Shared.Client.Core.Enums;
 using NSL.SocketCore.Extensions.Buffer;
 using NSL.SocketCore.Utils.Buffer;
+using NSL.SocketCore.Utils.Exceptions;
 using NSL.SocketCore.Utils.Logger.Enums;
 using NSL.Utils.Unity;
 using NSL.WebSockets.Client;
@@ -20,6 +21,7 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
+using System.Net.WebSockets;
 using System.Threading;
 using System.Threading.Tasks;
 using UnityEngine;
@@ -99,6 +101,8 @@ public class NodeRoomClient : IDisposable
 
                         builder.AddConnectHandle(client =>
                         {
+                            client.IsSigned = false;
+
                             client.ServerUrl = url;
 
                             client.PingPongEnabled = true;
@@ -117,8 +121,11 @@ public class NodeRoomClient : IDisposable
 
                         builder.AddExceptionHandle((ex, c) =>
                         {
-                            logHandle?.Invoke(LoggerLevel.Error, $"[Room Server] - {ex.ToString()}");
+                            if (ex is ConnectionLostException 
+                            || ex is WebSocketException)
+                                return;
 
+                            logHandle?.Invoke(LoggerLevel.Error, $"[Room Server] - {ex.ToString()}");
                         });
 
                         builder.AddDisconnectAsyncHandle(async client =>
@@ -362,6 +369,11 @@ public class NodeRoomClient : IDisposable
 
         foreach (var item in connections)
         {
+            for (int i = 0; i < 3 && item.Value.NetworkClient.Data?.IsSigned != true; i++)
+            {
+                await delayHandle(1_000, item.Value.NetworkClient.Data.LiveConnectionToken, false);
+            }
+
             if (item.Value.NetworkClient.Data?.IsSigned != true)
                 continue;
 
