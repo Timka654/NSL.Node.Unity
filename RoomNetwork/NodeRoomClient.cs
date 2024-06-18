@@ -37,6 +37,7 @@ public class NodeRoomClient : IDisposable
     private readonly string localNodeUdpEndPoint;
     private readonly Action onDisconnect;
     private readonly Action onRecoverySession;
+    Func<int, CancellationToken, bool, Task> delayHandle;
 
     public int ConnectionTimeout { get; set; } = 10_000;
 
@@ -53,6 +54,7 @@ public class NodeRoomClient : IDisposable
         NodeSessionStartupModel roomStartInfo,
         Dictionary<string, Guid> connectionPoints,
         string localNodeUdpEndPoint,
+        Func<int, CancellationToken, bool, Task> delayHandle,
         Action onDisconnect,
         Action onRecoverySession)
     {
@@ -62,6 +64,7 @@ public class NodeRoomClient : IDisposable
         this.roomStartInfo = roomStartInfo;
         this.connectionPoints = connectionPoints;
         this.localNodeUdpEndPoint = localNodeUdpEndPoint;
+        this.delayHandle = delayHandle;
         this.onDisconnect = onDisconnect;
         this.onRecoverySession = onRecoverySession;
     }
@@ -236,13 +239,15 @@ public class NodeRoomClient : IDisposable
         return true;
     }
 
-    private void TryRecoverySession(RoomConnectionInfo connection)
+    private async void TryRecoverySession(RoomConnectionInfo connection)
     {
         logHandle?.Invoke(LoggerLevel.Info, $"[Room Server] Disconnect handle - {nameof(TryRecoverySession)}");
 
         var network = connection.NetworkClient;
 
         var session = connection.SessionInfo;
+
+        await delayHandle(4_000, CancellationToken.None, false);
 
         network.Data.NSLSessionSendRequest(response =>
         {
@@ -355,7 +360,7 @@ public class NodeRoomClient : IDisposable
         }
     }
 
-    public async Task<bool> SendReady(int totalCount, IEnumerable<Guid> readyNodes, Func<int, CancellationToken, bool, Task> delayHandle)
+    public async Task<bool> SendReady(int totalCount, IEnumerable<Guid> readyNodes)
     {
         var p = RequestPacketBuffer.Create(RoomPacketEnum.ReadyNodeRequest);
 

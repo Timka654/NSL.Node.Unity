@@ -201,6 +201,7 @@ public class NodeNetwork : IRoomInfo, INodeNetwork, IDisposable
             roomStartInfo,
             connectionPoints,
             udpEndPointConnectionUrl,
+            DelayHandle,
             () => OnNodeDisconnect(LocalNode?.NodeInfo, false),
             () => OnRecoverySession(LocalNode?.NodeInfo));
 
@@ -272,7 +273,7 @@ public class NodeNetwork : IRoomInfo, INodeNetwork, IDisposable
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            valid = await roomClient?.SendReady(TotalNodeCount, connectedClients.Select(x => x.Key), DelayHandle) == true;
+            valid = await roomClient?.SendReady(TotalNodeCount, connectedClients.Select(x => x.Key)) == true;
 
             if (valid == false)
                 await DelayHandle(2_000, cancellationToken: cancellationToken);
