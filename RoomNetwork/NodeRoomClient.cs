@@ -257,6 +257,7 @@ public class NodeRoomClient : IDisposable
             {
                 connection.DisconnectTime = null;
                 connection.SessionInfo = response.SessionInfo;
+                onRecoverySession();
             }
             else
             {
