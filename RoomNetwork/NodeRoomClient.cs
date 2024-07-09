@@ -1,8 +1,7 @@
 using Cysharp.Threading.Tasks;
 using NSL.BuilderExtensions.SocketCore;
-using NSL.BuilderExtensions.WebSocketsClient;
+using NSL.EndPointBuilder;
 using NSL.Extensions.Session;
-using NSL.Extensions.Session.Client;
 using NSL.Extensions.Session.Client.Packets;
 using NSL.Node.Core.Models.Message;
 using NSL.Node.Core.Models.Requests;
@@ -11,41 +10,39 @@ using NSL.Node.Core.Models.Response;
 using NSL.BuilderExtensions.WebSocketsClient.Unity;
 #endif
 using NSL.Node.RoomServer.Shared.Client.Core.Enums;
+using NSL.SocketCore;
 using NSL.SocketCore.Extensions.Buffer;
 using NSL.SocketCore.Utils.Buffer;
-using NSL.SocketCore.Utils.Exceptions;
 using NSL.SocketCore.Utils.Logger.Enums;
 using NSL.Utils.Unity;
-using NSL.WebSockets.Client;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
-using System.Net.WebSockets;
 using System.Threading;
 using System.Threading.Tasks;
 using UnityEngine;
 using ZergRush;
 
-public class NodeRoomClient : IDisposable
+public abstract class NodeRoomClient : IDisposable
 {
-    private readonly INodeNetworkOptions node;
-    private readonly NodeLogDelegate logHandle;
-    private readonly OnChangeRoomStateDelegate changeStateHandle;
-    private readonly NodeSessionStartupModel roomStartInfo;
-    private readonly Dictionary<string, Guid> connectionPoints;
-    private readonly string localNodeUdpEndPoint;
-    private readonly Action onDisconnect;
-    private readonly Action onRecoverySession;
-    Func<int, CancellationToken, bool, Task> delayHandle;
+    protected readonly INodeNetworkOptions node;
+    protected readonly NodeLogDelegate logHandle;
+    protected readonly OnChangeRoomStateDelegate changeStateHandle;
+    protected readonly NodeSessionStartupModel roomStartInfo;
+    protected readonly Dictionary<string, Guid> connectionPoints;
+    protected readonly string localNodeUdpEndPoint;
+    protected readonly Action onDisconnect;
+    protected readonly Action onRecoverySession;
+    protected Func<int, CancellationToken, bool, Task> delayHandle;
 
     public int ConnectionTimeout { get; set; } = 10_000;
 
-    private Dictionary<string, RoomConnectionInfo> connections = new Dictionary<string, RoomConnectionInfo>();
+    protected Dictionary<string, RoomConnectionInfo> connections = new Dictionary<string, RoomConnectionInfo>();
 
     public bool AnyServers() => connections.Any();
 
-    public bool AnySignedServers() => connections.Values.Any(x => x.NetworkClient.Data?.IsSigned == true);
+    public bool AnySignedServers() => connections.Values.Any(x => x.Data?.IsSigned == true);
 
     public NodeRoomClient(
         INodeNetworkOptions node,
@@ -77,123 +74,9 @@ public class NodeRoomClient : IDisposable
             throw new Exception($"WaitAndRun : Can't find working transport servers");
     }
 
-    private RoomConnectionInfo createConnection(string url, Guid sessionId)
-    {
-        connections.TryGetValue(url, out var oldCI);
+    protected abstract RoomConnectionInfo createConnection(string url, Guid sessionId);
 
-        var connection = new RoomConnectionInfo()
-        {
-            Url = url,
-            SessionId = sessionId,
-            SessionInfo = oldCI?.SessionInfo,
-            DisconnectTime = oldCI?.DisconnectTime
-        };
-
-        connection.NetworkClient = WebSocketsClientEndPointBuilder.Create()
-                    .WithClientProcessor<RoomNetworkClient>()
-                    .WithOptions()
-                    .WithCode(builder =>
-                    {
-                        var options = builder.GetCoreOptions();
-
-                        builder.AddConnectHandle(client => client.InitializeObjectBag());
-
-                        options.ConfigureRequestProcessor(RoomPacketEnum.Response);
-
-                        builder.GetWSClientOptions().AddNSLSessions();
-
-                        builder.AddConnectHandle(client =>
-                        {
-                            client.IsSigned = false;
-
-                            client.ServerUrl = url;
-
-                            client.PingPongEnabled = true;
-
-                            if (connection.SessionInfo != null)
-                            {
-                                TryRecoverySession(connection);
-                            }
-                            else
-                            {
-                                SendSign(connection);
-                            }
-
-
-                        });
-
-                        builder.AddExceptionHandle((ex, c) =>
-                        {
-                            if (ex is ConnectionLostException 
-                            || ex is WebSocketException)
-                                return;
-
-                            logHandle?.Invoke(LoggerLevel.Error, $"[Room Server] - {ex.ToString()}");
-                        });
-
-                        builder.AddDisconnectAsyncHandle(async client =>
-                        {
-                            logHandle?.Invoke(LoggerLevel.Info, $"[Room Server] Disconnect handle");
-                            if (!disposed && connection.SessionInfo != null)
-                            {
-                                logHandle?.Invoke(LoggerLevel.Info, $"[Room Server] Disconnect handle - has session info");
-                                if (!connection.DisconnectTime.HasValue)
-                                {
-                                    connection.DisconnectTime = DateTime.UtcNow;
-                                    OnNodeConnectionLost(client.PlayerId);
-                                }
-
-                                if (connection.DisconnectTime.Value.Add(connection.SessionInfo.ExpiredSessionDelay) > DateTime.UtcNow)
-                                {
-                                    var nconnection = createConnection(url, sessionId);
-
-                                    if (await ConnectToServer(nconnection, CancellationToken.None))
-                                        connections[url] = nconnection;
-
-                                    return;
-                                }
-                            }
-
-                            client.Dispose();
-                            onDisconnect();
-                        });
-
-                        if (node.DebugPacketIO)
-                        {
-                            builder.AddSendHandle((c, pid, len, st) =>
-                            {
-                                if (!InputPacketBuffer.IsSystemPID(pid))
-                                    logHandle?.Invoke(LoggerLevel.Info, $"[Room Server] Send {pid}({Enum.GetName(typeof(RoomPacketEnum), pid)})");
-                            });
-
-                            builder.AddReceiveHandle((c, pid, len) =>
-                            {
-                                if (!InputPacketBuffer.IsSystemPID(pid))
-                                    logHandle?.Invoke(LoggerLevel.Info, $"[Room Server] Receive {pid}({Enum.GetName(typeof(RoomPacketEnum), pid)})");
-                            });
-                        }
-
-                        builder.AddPacketHandle(RoomPacketEnum.TransportMessage, OnTransportReceive);
-                        builder.AddPacketHandle(RoomPacketEnum.ExecuteMessage, OnExecuteReceive);
-                        builder.AddPacketHandle(RoomPacketEnum.ReadyRoomMessage, OnRoomReadyReceive);
-
-                        builder.AddPacketHandle(RoomPacketEnum.NodeConnectMessage, OnNodeConnectMessageReceive);
-                        builder.AddPacketHandle(RoomPacketEnum.RoomDestroyMessage, OnNodeRoomDestroyMessageReceive);
-                        builder.AddPacketHandle(RoomPacketEnum.NodeConnectionLostMessage, OnNodeConnectionLostReceive);
-                        builder.AddPacketHandle(RoomPacketEnum.NodeDisconnectMessage, OnNodeDisconnectReceive);
-                        builder.AddPacketHandle(RoomPacketEnum.NodeChangeEndPointMessage, OnNodeChangeEndPointReceive);
-                    })
-                    .WithUrl(new Uri(url))
-
-#if UNITY_WEBGL && !UNITY_EDITOR
-                .BuildForWGLPlatform()
-#else
-                    .Build()
-#endif
-                    ;
-
-        return connection;
-    }
+    protected abstract Task<bool> ConnectAsync(IClient client, int connectionTimeout);
 
     private async Task<int> connectToServers(CancellationToken cancellationToken)
     {
@@ -218,7 +101,7 @@ public class NodeRoomClient : IDisposable
         return connections.Count;
     }
 
-    private async Task<bool> ConnectToServer(RoomConnectionInfo connection, CancellationToken cancellationToken)
+    protected async Task<bool> ConnectToServer(RoomConnectionInfo connection, CancellationToken cancellationToken)
     {
         var url = connection.Url;
 
@@ -226,7 +109,7 @@ public class NodeRoomClient : IDisposable
 
         logHandle?.Invoke(LoggerLevel.Info, $"Try connect to {url}");
 
-        if (!await network.ConnectAsync(ConnectionTimeout))
+        if (!await ConnectAsync(network, ConnectionTimeout))
         {
             logHandle?.Invoke(LoggerLevel.Info, $"Cannot connect to {url}");
 
@@ -239,17 +122,17 @@ public class NodeRoomClient : IDisposable
         return true;
     }
 
-    private async void TryRecoverySession(RoomConnectionInfo connection)
+    protected async void TryRecoverySession(RoomConnectionInfo connection)
     {
         logHandle?.Invoke(LoggerLevel.Info, $"[Room Server] Disconnect handle - {nameof(TryRecoverySession)}");
 
-        var network = connection.NetworkClient;
+        var data = connection.Data;
 
         var session = connection.SessionInfo;
 
         await delayHandle(4_000, CancellationToken.None, false);
 
-        network.Data.NSLSessionSendRequest(response =>
+        data.NSLSessionSendRequest(response =>
         {
             logHandle?.Invoke(LoggerLevel.Info, $"Recovery session result - {response.Result.ToString()} {connection.Url}");
 
@@ -282,9 +165,9 @@ public class NodeRoomClient : IDisposable
         SendToServers(packet);
     }
 
-    private void SendSign(RoomConnectionInfo connectionInfo)
+    protected void SendSign(RoomConnectionInfo connectionInfo)
     {
-        var client = connectionInfo.NetworkClient.Data;
+        var client = connectionInfo.Data;
 
         var sessionId = connectionInfo.SessionId;
 
@@ -354,7 +237,7 @@ public class NodeRoomClient : IDisposable
     {
         foreach (var item in connections)
         {
-            if (item.Value.NetworkClient.Data?.IsSigned != true)
+            if (item.Value.Data?.IsSigned != true)
                 continue;
 
             item.Value.NetworkClient.Send(OutputPacketBuffer.Create(RoomPacketEnum.DisconnectMessage));
@@ -375,17 +258,17 @@ public class NodeRoomClient : IDisposable
 
         foreach (var item in connections)
         {
-            for (int i = 0; i < 3 && item.Value.NetworkClient.Data?.IsSigned != true; i++)
+            for (int i = 0; i < 3 && item.Value.Data?.IsSigned != true; i++)
             {
-                await delayHandle(1_000, item.Value.NetworkClient.Data.LiveConnectionToken, false);
+                await delayHandle(1_000, item.Value.Data.LiveConnectionToken, false);
             }
 
-            if (item.Value.NetworkClient.Data?.IsSigned != true)
+            if (item.Value.Data?.IsSigned != true)
                 continue;
 
             CancellationTokenSource cts = new CancellationTokenSource();
 
-            item.Value.NetworkClient.Data.GetRequestProcessor().SendRequest(p, data =>
+            item.Value.Data.GetRequestProcessor().SendRequest(p, data =>
             {
                 state = data?.ReadBool() == true;
 
@@ -394,7 +277,7 @@ public class NodeRoomClient : IDisposable
                 return true;
             }, false);
 
-            await delayHandle(4_000, CancellationTokenSource.CreateLinkedTokenSource(cts.Token, item.Value.NetworkClient.Data.LiveConnectionToken).Token, false);
+            await delayHandle(4_000, CancellationTokenSource.CreateLinkedTokenSource(cts.Token, item.Value.Data.LiveConnectionToken).Token, false);
 
             if (!state)
             {
@@ -503,7 +386,7 @@ public class NodeRoomClient : IDisposable
     public event OnRoomChangeNodeEndPointDelegate OnNodeChangeEndPoint = (nodeId, endPoint) => { };
 
 
-    private bool disposed = false;
+    protected bool disposed { get; private set; } = false;
 
     public void Dispose()
     {
@@ -524,7 +407,7 @@ public class NodeRoomClient : IDisposable
 
                 item.NetworkClient.Disconnect();
 
-                item.NetworkClient.Data.Dispose();
+                item.Data.Dispose();
             }
         }
 
@@ -542,17 +425,20 @@ public class NodeRoomClient : IDisposable
 
         }
     }
-}
 
-public class RoomConnectionInfo
-{
-    public string Url { get; set; }
+    protected void invokeConnectionLost(Guid playerId)
+        => OnNodeConnectionLost(playerId);
 
-    public Guid SessionId { get; set; }
+    protected void handlePackets(IOptionableEndPointBuilder<RoomNetworkClient> builder)
+    {
+        builder.AddPacketHandle(RoomPacketEnum.TransportMessage, OnTransportReceive);
+        builder.AddPacketHandle(RoomPacketEnum.ExecuteMessage, OnExecuteReceive);
+        builder.AddPacketHandle(RoomPacketEnum.ReadyRoomMessage, OnRoomReadyReceive);
 
-    public WSNetworkClient<RoomNetworkClient, WSClientOptions<RoomNetworkClient>> NetworkClient { get; set; }
-
-    public NSLSessionInfo SessionInfo { get; set; }
-
-    public DateTime? DisconnectTime { get; set; }
+        builder.AddPacketHandle(RoomPacketEnum.NodeConnectMessage, OnNodeConnectMessageReceive);
+        builder.AddPacketHandle(RoomPacketEnum.RoomDestroyMessage, OnNodeRoomDestroyMessageReceive);
+        builder.AddPacketHandle(RoomPacketEnum.NodeConnectionLostMessage, OnNodeConnectionLostReceive);
+        builder.AddPacketHandle(RoomPacketEnum.NodeDisconnectMessage, OnNodeDisconnectReceive);
+        builder.AddPacketHandle(RoomPacketEnum.NodeChangeEndPointMessage, OnNodeChangeEndPointReceive);
+    }
 }

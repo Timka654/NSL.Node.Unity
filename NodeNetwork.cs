@@ -62,12 +62,14 @@ public class NodeNetwork : IRoomInfo, INodeNetwork, IDisposable
 
     public bool DebugPacketIO { get; set; } = true;
 
+    public NodeNetworkChannelType NetworkChannelType { get; set; } = NodeNetworkChannelType.TCP;
+
     public event OnChangeRoomStateDelegate OnChangeRoomState = state =>
     {
     };
 
     public event OnChangeNodesReadyDelegate OnChangeNodesReady = (current, total) => { };
-    public event Action<NodeInfo> OnRecoverySession;
+    public event Action<NodeInfo> OnRecoverySession = node=> { };
 
     public NodeRoomStateEnum CurrentState { get; private set; }
 
@@ -78,6 +80,7 @@ public class NodeNetwork : IRoomInfo, INodeNetwork, IDisposable
     public Guid LocalNodeId { get; private set; }
 
     public NodeClient LocalNode { get; private set; }
+
 
     internal async void Initialize(NodeSessionStartupModel startupInfo, CancellationToken cancellationToken = default)
         => await InitializeAsync(startupInfo, cancellationToken);
@@ -194,16 +197,32 @@ public class NodeNetwork : IRoomInfo, INodeNetwork, IDisposable
 
         ChangeState(NodeRoomStateEnum.ConnectionTransportServers);
 
-        roomClient = new NodeRoomClient(
-            this,
-            LogHandle,
-            ChangeState,
-            roomStartInfo,
-            connectionPoints,
-            udpEndPointConnectionUrl,
-            DelayHandle,
-            () => OnNodeDisconnect(LocalNode?.NodeInfo, false),
-            () => OnRecoverySession(LocalNode?.NodeInfo));
+
+
+
+        roomClient = NetworkChannelType switch
+        {
+            NodeNetworkChannelType.WS => new NodeWSRoomClient(
+                                                               this,
+                                                               LogHandle,
+                                                               ChangeState,
+                                                               roomStartInfo,
+                                                               connectionPoints,
+                                                               udpEndPointConnectionUrl,
+                                                               DelayHandle,
+                                                               () => OnNodeDisconnect(LocalNode?.NodeInfo, false),
+                                                               () => OnRecoverySession(LocalNode?.NodeInfo)),
+            NodeNetworkChannelType.TCP => new NodeTCPRoomClient(
+                                                               this,
+                                                               LogHandle,
+                                                               ChangeState,
+                                                               roomStartInfo,
+                                                               connectionPoints,
+                                                               udpEndPointConnectionUrl,
+                                                               DelayHandle,
+                                                               () => OnNodeDisconnect(LocalNode?.NodeInfo, false),
+                                                               () => OnRecoverySession(LocalNode?.NodeInfo)),
+        };
 
         roomClient.OnExecute += roomClient_OnExecute;
 
@@ -637,4 +656,10 @@ public class NodeNetwork : IRoomInfo, INodeNetwork, IDisposable
     {
         throw new NotImplementedException();
     }
+}
+
+public enum NodeNetworkChannelType
+{
+    WS,
+    TCP
 }
