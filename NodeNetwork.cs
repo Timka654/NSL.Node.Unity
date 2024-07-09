@@ -197,8 +197,10 @@ public class NodeNetwork : IRoomInfo, INodeNetwork, IDisposable
 
         ChangeState(NodeRoomStateEnum.ConnectionTransportServers);
 
-
-
+        if (connectionPoints.All(x => x.Key.StartsWith("ws")))
+            NetworkChannelType = NodeNetworkChannelType.WS;
+        else if(connectionPoints.All(x => x.Key.StartsWith("tcp")))
+            NetworkChannelType = NodeNetworkChannelType.TCP;
 
         roomClient = NetworkChannelType switch
         {

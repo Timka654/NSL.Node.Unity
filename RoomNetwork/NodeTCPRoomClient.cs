@@ -28,7 +28,7 @@ public class NodeTCPRoomClient : NodeRoomClient
     protected override Task<bool> ConnectAsync(IClient client, int connectionTimeout)
     {
         var c = client as TCPNetworkClient<RoomNetworkClient, ClientOptions<RoomNetworkClient>>;
-
+        
         return c.ConnectAsync(connectionTimeout);
     }
 
