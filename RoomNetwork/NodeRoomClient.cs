@@ -235,7 +235,7 @@ public abstract class NodeRoomClient : IDisposable
 
     private void SendClientDisconnect()
     {
-        foreach (var item in connections)
+        foreach (var item in connections.ToArray())
         {
             if (item.Value.Data?.IsSigned != true)
                 continue;
@@ -256,7 +256,7 @@ public abstract class NodeRoomClient : IDisposable
 
         bool state = false;
 
-        foreach (var item in connections)
+        foreach (var item in connections.ToArray())
         {
             for (int i = 0; i < 3 && item.Value.Data?.IsSigned != true; i++)
             {
@@ -294,7 +294,7 @@ public abstract class NodeRoomClient : IDisposable
 
     public void SendToServers(OutputPacketBuffer packet)
     {
-        foreach (var item in connections)
+        foreach (var item in connections.ToArray())
         {
             if (!item.Value.NetworkClient.GetState())
                 continue;
