@@ -407,6 +407,20 @@ public class NodeNetwork : IRoomInfo, INodeNetwork, IDisposable
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public bool SendTo(NodeInfo node, byte[] buffer)
+    {
+        //node.Network.Send(buffer);
+
+        return false;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public bool SendTo(NodeInfo node, byte[] buffer, int offset, int len)
+    {
+        return false;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool SendTo(NodeClient node, ushort code, Action<DgramOutputPacketBuffer> builder)
     {
         if (!Ready)
