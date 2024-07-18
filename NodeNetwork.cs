@@ -16,18 +16,19 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
+using static NSL.Node.RoomServer.Shared.Client.Core.IRoomInfo;
 
 public class NodeNetwork : IRoomInfo, INodeNetwork, IDisposable
 {
     public NodeRoomClient roomClient;
 
-    public event Action<NodeInfo> OnNodeConnect = node => { };
+    public event OnNodeDelegate OnNodeConnect = node => Task.CompletedTask;
 
-    public event Action<NodeInfo> OnNodeConnectionLost = node => { };
+    public event OnNodeDelegate OnNodeConnectionLost = node => Task.CompletedTask;
 
-    public event IRoomInfo.OnNodeDisconnectDelegate OnNodeDisconnect = (node, manualDisconnected) => { };
+    public event IRoomInfo.OnNodeDisconnectDelegate OnNodeDisconnect = (node, manualDisconnected) => Task.CompletedTask;
 
-    public event Action OnRoomReady = () => { };
+    public event Func<Task> OnRoomReady = () => Task.CompletedTask;
 
     public int TotalNodeCount { get; private set; }
 
@@ -69,7 +70,7 @@ public class NodeNetwork : IRoomInfo, INodeNetwork, IDisposable
     };
 
     public event OnChangeNodesReadyDelegate OnChangeNodesReady = (current, total) => { };
-    public event Action<NodeInfo> OnRecoverySession = node=> { };
+    public event OnNodeDelegate OnRecoverySession = node => Task.CompletedTask;
 
     public NodeRoomStateEnum CurrentState { get; private set; }
 
@@ -199,7 +200,7 @@ public class NodeNetwork : IRoomInfo, INodeNetwork, IDisposable
 
         if (connectionPoints.All(x => x.Key.StartsWith("ws")))
             NetworkChannelType = NodeNetworkChannelType.WS;
-        else if(connectionPoints.All(x => x.Key.StartsWith("tcp")))
+        else if (connectionPoints.All(x => x.Key.StartsWith("tcp")))
             NetworkChannelType = NodeNetworkChannelType.TCP;
 
         roomClient = NetworkChannelType switch
@@ -668,7 +669,7 @@ public class NodeNetwork : IRoomInfo, INodeNetwork, IDisposable
     public IEnumerable<NodeInfo> GetNodes()
         => connectedClients.Values.Select(x => x.NodeInfo).ToArray();
 
-    public void RecoverySession(NodeInfo node)
+    public Task RecoverySession(NodeInfo node)
     {
         throw new NotImplementedException();
     }

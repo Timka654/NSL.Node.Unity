@@ -2,14 +2,15 @@
 using NSL.SocketCore.Utils.Buffer;
 using NSL.UDP;
 using System;
+using System.Threading.Tasks;
 
 public interface INodeNetwork : INodeNetworkOptions
 {
     Guid LocalNodeId { get; }
 
     event OnChangeRoomStateDelegate OnChangeRoomState;
-    event Action<NodeInfo> OnNodeConnect;
-    event Action OnRoomReady;
+    event IRoomInfo.OnNodeDelegate OnNodeConnect;
+    event Func<Task> OnRoomReady;
 
     DgramOutputPacketBuffer CreateSendToPacket(ushort command);
     OutputPacketBuffer CreateSendToServerPacket(ushort command);
