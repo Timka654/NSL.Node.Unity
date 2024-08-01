@@ -33,7 +33,7 @@ public class UnityNodeNetwork : NodeNetwork
         try { await UniTask.Delay(milliseconds, cancellationToken: cancellationToken); } catch (OperationCanceledException) { if (_throw) throw; }
     }
 
-    public void FillOwner(GameObject obj, Guid nodeId)
+    public void FillOwner(GameObject obj, string nodeId)
     {
         var node = GetNode(nodeId);
 
@@ -46,7 +46,7 @@ public class UnityNodeNetwork : NodeNetwork
         }
     }
 
-    public void SetOwner(UnityNodeBehaviour obj, Guid nodeId)
+    public void SetOwner(UnityNodeBehaviour obj, string nodeId)
     {
         var node = GetNode(nodeId);
 

@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 public interface INodeNetwork : INodeNetworkOptions
 {
-    Guid LocalNodeId { get; }
+    string LocalNodeId { get; }
 
     event OnChangeRoomStateDelegate OnChangeRoomState;
     event IRoomInfo.OnNodeDelegate OnNodeConnect;
@@ -17,7 +17,7 @@ public interface INodeNetwork : INodeNetworkOptions
 
     void Broadcast(DgramOutputPacketBuffer packet, bool disposeOnSend = true);
 
-    bool SendTo(Guid nodeId, DgramOutputPacketBuffer packet, bool disposeOnSend = true);
+    bool SendTo(string nodeId, DgramOutputPacketBuffer packet, bool disposeOnSend = true);
     bool SendTo(NodeInfo node, DgramOutputPacketBuffer packet, bool disposeOnSend = true);
 
     void Invoke(NodeInfo nodeInfo, InputPacketBuffer buffer);

@@ -187,7 +187,7 @@ public abstract class NodeRoomClient : IDisposable
         {
             var result = data.ReadNullableClass(() => new RoomNodeSignInResponseModel
             {
-                NodeId = data.ReadNullable(() => data.ReadGuid()),
+                NodeId = data.ReadString(),
                 Options = data.ReadNullableClass(() => data.ReadCollection(() =>
                 {
                     string key = data.ReadString();
@@ -209,7 +209,7 @@ public abstract class NodeRoomClient : IDisposable
 
                 connectionInfo.SessionInfo = result.SessionInfo;
 
-                client.PlayerId = result.NodeId.Value;
+                client.PlayerId = result.NodeId;
                 client.IsSigned = true;
 
                 logHandle(LoggerLevel.Info, $"Success signed on {client.ServerUrl} - {sessionId}");
@@ -244,7 +244,7 @@ public abstract class NodeRoomClient : IDisposable
         }
     }
 
-    public async Task<bool> SendReady(int totalCount, IEnumerable<Guid> readyNodes)
+    public async Task<bool> SendReady(int totalCount, IEnumerable<string> readyNodes)
     {
         var p = RequestPacketBuffer.Create(RoomPacketEnum.ReadyNodeRequest);
 
@@ -327,7 +327,7 @@ public abstract class NodeRoomClient : IDisposable
     {
         data.ReadGuid(); // local node
 
-        var nid = data.ReadGuid(); // from node
+        var nid = data.ReadString(); // from node
 
         var len = (int)(data.Length - data.Position);
 
@@ -353,17 +353,17 @@ public abstract class NodeRoomClient : IDisposable
 
     private void OnNodeConnectionLostReceive(RoomNetworkClient client, InputPacketBuffer data)
     {
-        OnNodeConnectionLost(data.ReadGuid());
+        OnNodeConnectionLost(data.ReadString());
     }
 
     private void OnNodeDisconnectReceive(RoomNetworkClient client, InputPacketBuffer data)
     {
-        OnNodeDisconnect(data.ReadGuid());
+        OnNodeDisconnect(data.ReadString());
     }
 
     private void OnNodeChangeEndPointReceive(RoomNetworkClient client, InputPacketBuffer data)
     {
-        OnNodeChangeEndPoint(data.ReadGuid(), data.ReadString());
+        OnNodeChangeEndPoint(data.ReadString(), data.ReadString());
     }
 
     #endregion
@@ -426,7 +426,7 @@ public abstract class NodeRoomClient : IDisposable
         }
     }
 
-    protected void invokeConnectionLost(Guid playerId)
+    protected void invokeConnectionLost(string playerId)
         => OnNodeConnectionLost(playerId);
 
     protected void handlePackets(IOptionableEndPointBuilder<RoomNetworkClient> builder)

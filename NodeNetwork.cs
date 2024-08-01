@@ -42,7 +42,7 @@ public class NodeNetwork : IRoomInfo, INodeNetwork, IDisposable
 
     public NSLSessionInfo Session { get; private set; }
 
-    private ConcurrentDictionary<Guid, NodeClient> connectedClients = new ConcurrentDictionary<Guid, NodeClient>();
+    private ConcurrentDictionary<string, NodeClient> connectedClients = new ConcurrentDictionary<string, NodeClient>();
 
     /// <summary>
     /// Can set how transport all data - P2P, Proxy, All
@@ -78,7 +78,7 @@ public class NodeNetwork : IRoomInfo, INodeNetwork, IDisposable
 
     public IRoomSession RoomSession { get; private set; }
 
-    public Guid LocalNodeId { get; private set; }
+    public string LocalNodeId { get; private set; }
 
     public NodeClient LocalNode { get; private set; }
 
@@ -90,7 +90,7 @@ public class NodeNetwork : IRoomInfo, INodeNetwork, IDisposable
     {
         roomStartInfo = startupInfo;
 
-        LocalNodeId = Guid.Parse(roomStartInfo.Token.Split(':').First());
+        LocalNodeId = roomStartInfo.Token.Split(':').First();
 
         try
         {
@@ -272,7 +272,7 @@ public class NodeNetwork : IRoomInfo, INodeNetwork, IDisposable
         Invoke((NodeInfo)null, buffer);
     }
 
-    private void roomClient_OnTransport(Guid nodeId, InputPacketBuffer buffer)
+    private void roomClient_OnTransport(string nodeId, InputPacketBuffer buffer)
     {
         if (!connectedClients.TryGetValue(nodeId, out var client))
             return;
@@ -370,7 +370,7 @@ public class NodeNetwork : IRoomInfo, INodeNetwork, IDisposable
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public bool SendTo(Guid nodeId, DgramOutputPacketBuffer packet, bool disposeOnSend = true)
+    public bool SendTo(string nodeId, DgramOutputPacketBuffer packet, bool disposeOnSend = true)
     {
         if (connectedClients.TryGetValue(nodeId, out var node))
             return SendTo(node.NodeInfo, packet, disposeOnSend);
@@ -381,7 +381,7 @@ public class NodeNetwork : IRoomInfo, INodeNetwork, IDisposable
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public bool SendTo(Guid nodeId, UDPChannelEnum channel, DgramOutputPacketBuffer packet, bool disposeOnSend = true)
+    public bool SendTo(string nodeId, UDPChannelEnum channel, DgramOutputPacketBuffer packet, bool disposeOnSend = true)
     {
         if (connectedClients.TryGetValue(nodeId, out var node))
             return SendTo(node.NodeInfo, channel, packet, disposeOnSend);
@@ -466,7 +466,7 @@ public class NodeNetwork : IRoomInfo, INodeNetwork, IDisposable
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public bool SendTo(Guid nodeId, Action<DgramOutputPacketBuffer> builder)
+    public bool SendTo(string nodeId, Action<DgramOutputPacketBuffer> builder)
     {
         if (connectedClients.TryGetValue(nodeId, out var node))
             return SendTo(node, builder);
@@ -475,7 +475,7 @@ public class NodeNetwork : IRoomInfo, INodeNetwork, IDisposable
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public bool SendTo(Guid nodeId, UDPChannelEnum channel, Action<DgramOutputPacketBuffer> builder)
+    public bool SendTo(string nodeId, UDPChannelEnum channel, Action<DgramOutputPacketBuffer> builder)
     {
         if (connectedClients.TryGetValue(nodeId, out var node))
             return SendTo(node, channel, builder);
@@ -484,7 +484,7 @@ public class NodeNetwork : IRoomInfo, INodeNetwork, IDisposable
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public bool SendTo(Guid nodeId, ushort command, Action<DgramOutputPacketBuffer> build)
+    public bool SendTo(string nodeId, ushort command, Action<DgramOutputPacketBuffer> build)
     {
         if (connectedClients.TryGetValue(nodeId, out var node))
             return SendTo(node, command, build);
@@ -493,7 +493,7 @@ public class NodeNetwork : IRoomInfo, INodeNetwork, IDisposable
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public bool SendTo(Guid nodeId, ushort command, UDPChannelEnum channel, Action<DgramOutputPacketBuffer> build)
+    public bool SendTo(string nodeId, ushort command, UDPChannelEnum channel, Action<DgramOutputPacketBuffer> build)
     {
         if (connectedClients.TryGetValue(nodeId, out var node))
             return SendTo(node, command, channel, build);
@@ -657,7 +657,7 @@ public class NodeNetwork : IRoomInfo, INodeNetwork, IDisposable
 
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public NodeInfo GetNode(Guid id)
+    public NodeInfo GetNode(string id)
     {
         if (connectedClients.TryGetValue(id, out var node))
             return node.NodeInfo;

@@ -7,7 +7,7 @@
   "targets": {
     ".NETStandard,Version=v2.1": {},
     ".NETStandard,Version=v2.1/": {
-      "Unity.NSL.Node.BridgeServer.Shared/2024.07.18.1208": {
+      "Unity.NSL.Node.BridgeServer.Shared/2024.08.01.1143": {
         "dependencies": {
           "Unity.NSL.Generators.BinaryTypeIOGenerator": "2024.6.18.1240",
           "Unity.NSL.Generators.BinaryTypeIOGenerator.Attributes": "2024.6.18.1240",
@@ -44,7 +44,7 @@
     }
   },
   "libraries": {
-    "Unity.NSL.Node.BridgeServer.Shared/2024.07.18.1208": {
+    "Unity.NSL.Node.BridgeServer.Shared/2024.08.01.1143": {
       "type": "project",
       "serviceable": false,
       "sha512": ""

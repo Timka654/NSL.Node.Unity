@@ -43,10 +43,10 @@ public abstract class UnityNodeRoom : UnityEngine.MonoBehaviour, IDisposable
         await NodeNetwork.InitializeAsync(startupInfo, cancellationToken);
     }
 
-    public void FillOwner(GameObject obj, Guid nodeId)
+    public void FillOwner(GameObject obj, string nodeId)
         => NodeNetwork.FillOwner(obj, nodeId);
 
-    public void SetOwner(UnityNodeBehaviour obj, Guid nodeId)
+    public void SetOwner(UnityNodeBehaviour obj, string nodeId)
         => NodeNetwork.SetOwner(obj, nodeId);
 
 

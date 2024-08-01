@@ -7,9 +7,9 @@ public class RoomNetworkClient : BaseSocketNetworkClient
 {
     public string ServerUrl { get; set; }
 
-    public Guid LocalNodeIdentity => PlayerId;
+    public string LocalNodeIdentity => PlayerId;
 
-    public Guid PlayerId { get; set; }
+    public string PlayerId { get; set; }
 
     private CancellationTokenSource LiveConnectionCTS = new CancellationTokenSource();
 
