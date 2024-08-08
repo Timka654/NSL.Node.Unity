@@ -13,10 +13,9 @@ public abstract class UnityNodeRoom : UnityEngine.MonoBehaviour, IDisposable
     public NodeTransportModeEnum TransportMode = NodeTransportModeEnum.ProxyOnly;
 
     /// <summary>
-    /// 1 unit = 1 second
-    /// for no wait connections set this value to default = 0
+    /// default = 30 000 ms
     /// </summary>
-    public int MaxNodesWaitCycle = 10;
+    public int MaxReadyWaitDelay = 30_000;
 
     public bool DebugPacketIO = true;
 
@@ -31,7 +30,7 @@ public abstract class UnityNodeRoom : UnityEngine.MonoBehaviour, IDisposable
             cancellationToken = (cts = new CancellationTokenSource()).Token;
 
         NodeNetwork.TransportMode = TransportMode;
-        NodeNetwork.MaxNodesWaitCycle = MaxNodesWaitCycle;
+        NodeNetwork.MaxReadyWaitDelay = MaxReadyWaitDelay;
         NodeNetwork.DebugPacketIO = DebugPacketIO;
 
         await NodeNetwork.InitializeAsync(startupInfo, cancellationToken);

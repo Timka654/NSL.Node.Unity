@@ -2,7 +2,7 @@
 {
     NodeTransportModeEnum TransportMode { get; set; }
 
-    int MaxNodesWaitCycle { get; set; }
+    int MaxReadyWaitDelay { get; set; }
 
     bool DebugPacketIO { get; set; }
 }

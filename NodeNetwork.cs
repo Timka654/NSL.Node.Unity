@@ -52,10 +52,9 @@ public class NodeNetwork : IRoomInfo, INodeNetwork, IDisposable
     public NodeTransportModeEnum TransportMode { get; set; } = NodeTransportModeEnum.ProxyOnly;
 
     /// <summary>
-    /// 1 unit = 1 second
-    /// for no wait connections set this value to default = 0
+    /// default = 30 000 ms
     /// </summary>
-    public int MaxNodesWaitCycle { get; set; } = 10;
+    public int MaxReadyWaitDelay { get; set; } = 30000;
 
     public bool DebugPacketIO { get; set; } = true;
 
@@ -101,7 +100,7 @@ public class NodeNetwork : IRoomInfo, INodeNetwork, IDisposable
             await initRooms(startupInfo.ConnectionEndPoints, cancellationToken);
 
             if (!readyWaitToken.Token.IsCancellationRequested)
-                await DelayHandle(MaxNodesWaitCycle * 1000, readyWaitToken.Token, false);
+                await DelayHandle(MaxReadyWaitDelay, readyWaitToken.Token, false);
 
             if (CurrentState != NodeRoomStateEnum.Ready)
                 ChangeState(NodeRoomStateEnum.Invalid);
