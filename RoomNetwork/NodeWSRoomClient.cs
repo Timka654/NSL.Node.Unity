@@ -69,6 +69,7 @@ public class NodeWSRoomClient : NodeRoomClient
                             }
                             else
                             {
+                                connections.Add(url, connection);
                                 SendSign(connection);
                             }
 
@@ -81,15 +82,15 @@ public class NodeWSRoomClient : NodeRoomClient
                             || ex is WebSocketException)
                                 return;
 
-                            logHandle?.Invoke(LoggerLevel.Error, $"[Room Server] - {ex.ToString()}");
+                            logHandle?.Invoke(LoggerLevel.Error, $"[Room Server]({connection} - {roomStartInfo}) - {ex.ToString()}");
                         });
 
                         builder.AddDisconnectAsyncHandle(async client =>
                         {
-                            logHandle?.Invoke(LoggerLevel.Info, $"[Room Server] Disconnect handle");
+                            logHandle?.Invoke(LoggerLevel.Info, $"[Room Server] Disconnect handle - {connection} - {roomStartInfo}");
                             if (!disposed && connection.SessionInfo != null)
                             {
-                                logHandle?.Invoke(LoggerLevel.Info, $"[Room Server] Disconnect handle - has session info");
+                                logHandle?.Invoke(LoggerLevel.Info, $"[Room Server] Disconnect handle - {connection} - {roomStartInfo} - has session info");
                                 if (!connection.DisconnectTime.HasValue)
                                 {
                                     connection.DisconnectTime = DateTime.UtcNow;
@@ -108,6 +109,9 @@ public class NodeWSRoomClient : NodeRoomClient
                             }
 
                             client.Dispose();
+
+                            connections.Remove(url);
+
                             onDisconnect();
                         });
 

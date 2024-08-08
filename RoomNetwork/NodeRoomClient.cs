@@ -94,8 +94,7 @@ public abstract class NodeRoomClient : IDisposable
 
         foreach (var item in roomServers)
         {
-            if (await ConnectToServer(item.Value, cancellationToken))
-                connections.Add(item.Key, item.Value);
+            await ConnectToServer(item.Value, cancellationToken);
         }
 
         return connections.Count;
@@ -107,16 +106,16 @@ public abstract class NodeRoomClient : IDisposable
 
         var network = connection.NetworkClient;
 
-        logHandle?.Invoke(LoggerLevel.Info, $"Try connect to {url}");
+        logHandle?.Invoke(LoggerLevel.Info, $"Try connect to {connection} - {roomStartInfo}");
 
         if (!await ConnectAsync(network, ConnectionTimeout))
         {
-            logHandle?.Invoke(LoggerLevel.Info, $"Cannot connect to {url}");
+            logHandle?.Invoke(LoggerLevel.Error, $"Cannot connect to {connection} - {roomStartInfo}");
 
             return false;
         }
 
-        logHandle?.Invoke(LoggerLevel.Info, $"Success connect to {url}");
+        logHandle?.Invoke(LoggerLevel.Info, $"Success connect to {connection} - {roomStartInfo}");
         cancellationToken.ThrowIfCancellationRequested();
 
         return true;
@@ -124,7 +123,7 @@ public abstract class NodeRoomClient : IDisposable
 
     protected async void TryRecoverySession(RoomConnectionInfo connection)
     {
-        logHandle?.Invoke(LoggerLevel.Info, $"[Room Server] Disconnect handle - {nameof(TryRecoverySession)}");
+        logHandle?.Invoke(LoggerLevel.Info, $"[Room Server] Disconnect handle - {nameof(TryRecoverySession)} - {connection} - {roomStartInfo}");
 
         var data = connection.Data;
 
@@ -134,7 +133,7 @@ public abstract class NodeRoomClient : IDisposable
 
         data.NSLSessionSendRequest(response =>
         {
-            logHandle?.Invoke(LoggerLevel.Info, $"Recovery session result - {response.Result.ToString()} {connection.Url}");
+            logHandle?.Invoke(LoggerLevel.Info, $"Recovery session result - {response.Result.ToString()} {connection} - {roomStartInfo}");
 
             if (response.Result == NSLRecoverySessionResultEnum.Ok)
             {
@@ -185,23 +184,14 @@ public abstract class NodeRoomClient : IDisposable
 
         requestProcessor.SendRequest(packet, (data) =>
         {
-            var result = data.ReadNullableClass(() => new RoomNodeSignInResponseModel
-            {
-                NodeId = data.ReadString(),
-                Options = data.ReadNullableClass(() => data.ReadCollection(() =>
-                {
-                    string key = data.ReadString();
-                    string value = data.ReadString();
-                    return new { key, value };
-                })?.ToDictionary(x => x.key, x => x.value)),
-                SessionInfo = data.ReadNullableClass(() => new NSLSessionInfo
-                {
-                    ExpiredSessionDelay = data.ReadTimeSpan(),
-                    RestoreKeys = data.ReadCollection(() => data.ReadString())?.ToArray(),
-                    Session = data.ReadString()
-                }),
-                Success = data.ReadBool()
-            });
+            RoomNodeSignInResponseModel? result = null;
+            
+            if(data != null)
+                result = RoomNodeSignInResponseModel.ReadFullFrom(data);
+            else
+                logHandle(LoggerLevel.Error, $"Sign in response return null!!");
+
+            result ??= new RoomNodeSignInResponseModel();
 
             if (result.Success)
             {
@@ -212,7 +202,7 @@ public abstract class NodeRoomClient : IDisposable
                 client.PlayerId = result.NodeId;
                 client.IsSigned = true;
 
-                logHandle(LoggerLevel.Info, $"Success signed on {client.ServerUrl} - {sessionId}");
+                logHandle(LoggerLevel.Info, $"Success signed on {connectionInfo} - {roomStartInfo}");
             }
 
             OnSignIn(client, result);
@@ -223,7 +213,7 @@ public abstract class NodeRoomClient : IDisposable
             }
             else
             {
-                logHandle(LoggerLevel.Error, $"Cannot sign on {nameof(NodeRoomClient)}({client.ServerUrl} - {sessionId})");
+                logHandle(LoggerLevel.Error, $"Cannot sign on {nameof(NodeRoomClient)}({connectionInfo} - {roomStartInfo})");
                 connections.Remove(client.ServerUrl);
                 client.Network.Disconnect();
             }
@@ -244,53 +234,65 @@ public abstract class NodeRoomClient : IDisposable
         }
     }
 
-    public async Task<bool> SendReady(int totalCount, IEnumerable<string> readyNodes)
-    {
-        var p = RequestPacketBuffer.Create(RoomPacketEnum.ReadyNodeRequest);
+    //public async Task<bool> SendReady(int totalCount, IEnumerable<string> readyNodes)
+    //{
+    //    var p = RequestPacketBuffer.Create(RoomPacketEnum.ReadyNodeRequest);
 
-        new RoomNodeReadyRequestModel()
-        {
-            ConnectedNodes = readyNodes.ToList(),
-            ConnectedNodesCount = totalCount
-        }.WriteFullTo(p);
+    //    new RoomNodeReadyRequestModel()
+    //    {
+    //        ConnectedNodes = readyNodes.ToList(),
+    //        ConnectedNodesCount = totalCount
+    //    }.WriteFullTo(p);
 
-        bool state = false;
+    //    bool state = false;
 
-        foreach (var item in connections.ToArray())
-        {
-            for (int i = 0; i < 3 && item.Value.Data?.IsSigned != true; i++)
-            {
-                await delayHandle(1_000, item.Value.Data.LiveConnectionToken, false);
-            }
+    //    foreach (var item in connections.ToArray())
+    //    {
+    //        for (int i = 0; i < 3 && item.Value.Data?.IsSigned != true; i++)
+    //        {
+    //            await delayHandle(1_000, item.Value.Data.LiveConnectionToken, false);
+    //        }
 
-            if (item.Value.Data?.IsSigned != true)
-                continue;
+    //        if (item.Value.Data?.IsSigned != true)
+    //            continue;
 
-            CancellationTokenSource cts = new CancellationTokenSource();
+    //        CancellationTokenSource cts = new CancellationTokenSource();
 
-            item.Value.Data.GetRequestProcessor().SendRequest(p, data =>
-            {
-                state = data?.ReadBool() == true;
+    //        var rp = item.Value.Data.GetRequestProcessor(throwIfNotExists: false);
+    //        rp?.SendRequest(p, data =>
+    //        {
+    //            state = data?.ReadBool() == true;
 
-                cts.Cancel();
+    //            if (!state)
+    //            {
+    //                Debug.LogError($"node debug -- {item.Value} - {roomStartInfo}) - state false - response {data != null}");
+    //            }
 
-                return true;
-            }, false);
+    //            cts.Cancel();
 
-            await delayHandle(4_000, CancellationTokenSource.CreateLinkedTokenSource(cts.Token, item.Value.Data.LiveConnectionToken).Token, false);
+    //            return true;
+    //        }, false);
 
-            if (!state)
-            {
-                Debug.LogError($"[Node] ({connections.IndexOf(item)}/{connections.Count}) State for connect to room = false {item.Key}");
-                return state;
-            }
-        }
+    //        if (rp != null)
+    //            await delayHandle(4_000, CancellationTokenSource.CreateLinkedTokenSource(cts.Token, item.Value.Data.LiveConnectionToken).Token, false);
 
-        if (state == false)
-            Debug.LogError($"[Node] not any servers");
+    //        else if (connections.ContainsKey(item.Key) && connections.TryGetValue(item.Key,out var cr))
+    //        {
+    //            Debug.LogError($"node debug -- connection contains, but request processor not initialized - {item.Value} - {roomStartInfo}) - replaced {cr != item.Value}");
+    //        }
 
-        return state;
-    }
+    //        if (!state)
+    //        {
+    //            logHandle(LoggerLevel.Info, $"[Node] ({connections.IndexOf(item) + 1}/{connections.Count}) State for connect to room = false ({item.Value} - {roomStartInfo})");
+
+    //            return state;
+    //        }
+    //        else
+    //            logHandle(LoggerLevel.Info, $"[Node] ({connections.IndexOf(item) + 1}/{connections.Count}) State for connect to room = true ({item.Value} - {roomStartInfo})");
+    //    }
+
+    //    return state;
+    //}
 
     public void SendToServers(OutputPacketBuffer packet)
     {
@@ -317,7 +319,7 @@ public abstract class NodeRoomClient : IDisposable
         var createTime = data.ReadDateTime();
 
 #if DEBUG
-        logHandle(LoggerLevel.Debug, $"{nameof(OnRoomReadyReceive)} - {createTime} - {offset}");
+        logHandle(LoggerLevel.Debug, $"{nameof(OnRoomReadyReceive)}({roomStartInfo}) - {createTime} - {offset}");
 #endif
 
         changeStateHandle(NodeRoomStateEnum.Ready);

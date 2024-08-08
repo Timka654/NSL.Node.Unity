@@ -4,7 +4,5 @@
 
     int MaxNodesWaitCycle { get; set; }
 
-    int WaitBridgeDelayMS { get; set; }
-
     bool DebugPacketIO { get; set; }
 }

@@ -77,6 +77,7 @@ public class NodeTCPRoomClient : NodeRoomClient
                             }
                             else
                             {
+                                connections.Add(url, connection);
                                 SendSign(connection);
                             }
 
@@ -89,15 +90,20 @@ public class NodeTCPRoomClient : NodeRoomClient
                             || ex is WebSocketException)
                                 return;
 
-                            logHandle?.Invoke(LoggerLevel.Error, $"[Room Server] - {ex.ToString()}");
+                            logHandle(LoggerLevel.Error, $"[Room Server]({roomStartInfo}) - {ex.ToString()}");
+                        });
+
+                        builder.AddDisconnectHandle(client =>
+                        {
+                            logHandle(LoggerLevel.Info, $"[Room Server]AddDisconnectHandle - Disconnect handle ({roomStartInfo})");
                         });
 
                         builder.AddDisconnectAsyncHandle(async client =>
                         {
-                            logHandle?.Invoke(LoggerLevel.Info, $"[Room Server] Disconnect handle");
+                            logHandle(LoggerLevel.Info, $"[Room Server] Disconnect handle ({roomStartInfo})");
                             if (!disposed && connection.SessionInfo != null)
                             {
-                                logHandle?.Invoke(LoggerLevel.Info, $"[Room Server] Disconnect handle - has session info");
+                                logHandle(LoggerLevel.Info, $"[Room Server] Disconnect handle - has session info ({roomStartInfo})");
                                 if (!connection.DisconnectTime.HasValue)
                                 {
                                     connection.DisconnectTime = DateTime.UtcNow;
@@ -116,6 +122,9 @@ public class NodeTCPRoomClient : NodeRoomClient
                             }
 
                             client.Dispose();
+
+                            connections.Remove(url);
+
                             onDisconnect();
                         });
 
@@ -124,13 +133,13 @@ public class NodeTCPRoomClient : NodeRoomClient
                             builder.AddSendHandle((c, pid, len, st) =>
                             {
                                 if (!InputPacketBuffer.IsSystemPID(pid))
-                                    logHandle?.Invoke(LoggerLevel.Info, $"[Room Server] Send {pid}({Enum.GetName(typeof(RoomPacketEnum), pid)})");
+                                    logHandle(LoggerLevel.Info, $"[Room Server] {roomStartInfo} Send {pid}({Enum.GetName(typeof(RoomPacketEnum), pid)})");
                             });
 
                             builder.AddReceiveHandle((c, pid, len) =>
                             {
                                 if (!InputPacketBuffer.IsSystemPID(pid))
-                                    logHandle?.Invoke(LoggerLevel.Info, $"[Room Server] Receive {pid}({Enum.GetName(typeof(RoomPacketEnum), pid)})");
+                                    logHandle(LoggerLevel.Info, $"[Room Server] {roomStartInfo} Receive {pid}({Enum.GetName(typeof(RoomPacketEnum), pid)})");
                             });
                         }
 

@@ -7,15 +7,23 @@
   "targets": {
     ".NETStandard,Version=v2.1": {},
     ".NETStandard,Version=v2.1/": {
-      "Unity.NSL.Node.Core/2024.08.01.1143": {
+      "Unity.NSL.Node.Core/2024.08.08.1551": {
         "dependencies": {
-          "Unity.NSL.Extensions.Session": "2024.6.18.1240",
-          "Unity.NSL.Generators.BinaryTypeIOGenerator": "2024.6.18.1240",
-          "Unity.NSL.Generators.BinaryTypeIOGenerator.Attributes": "2024.6.18.1240",
-          "Unity.NSL.UDP": "2024.6.18.1240"
+          "Unity.NSL.Extensions.Session": "2024.8.6.1532",
+          "Unity.NSL.Generators.BinaryTypeIOGenerator": "2024.8.6.1532",
+          "Unity.NSL.Generators.BinaryTypeIOGenerator.Attributes": "2024.8.6.1532",
+          "Unity.NSL.UDP": "2024.8.6.1532"
         },
         "runtime": {
           "Unity.NSL.Node.Core.dll": {}
+        }
+      },
+      "Newtonsoft.Json/13.0.3": {
+        "runtime": {
+          "lib/netstandard2.0/Newtonsoft.Json.dll": {
+            "assemblyVersion": "13.0.0.0",
+            "fileVersion": "13.0.3.27908"
+          }
         }
       },
       "STUN/0.5.0": {
@@ -34,87 +42,108 @@
           }
         }
       },
-      "Unity.NSL.EndPointBuilder/2024.6.18.1240": {
+      "Unity.NSL.EndPointBuilder/2024.8.6.1532": {
         "dependencies": {
-          "Unity.NSL.SocketCore": "2024.6.18.1240"
+          "Unity.NSL.SocketCore": "2024.8.6.1532"
         },
         "runtime": {
           "lib/netstandard2.0/Unity.NSL.EndPointBuilder.dll": {
-            "assemblyVersion": "2024.6.18.1240",
-            "fileVersion": "2024.6.18.1240"
+            "assemblyVersion": "2024.8.6.1532",
+            "fileVersion": "2024.8.6.1532"
           }
         }
       },
-      "Unity.NSL.Extensions.Session/2024.6.18.1240": {
+      "Unity.NSL.Extensions.Session/2024.8.6.1532": {
         "dependencies": {
-          "Unity.NSL.Generators.BinaryTypeIOGenerator": "2024.6.18.1240",
-          "Unity.NSL.Generators.BinaryTypeIOGenerator.Attributes": "2024.6.18.1240",
-          "Unity.NSL.SocketCore": "2024.6.18.1240"
+          "Unity.NSL.Generators.BinaryTypeIOGenerator": "2024.8.6.1532",
+          "Unity.NSL.Generators.BinaryTypeIOGenerator.Attributes": "2024.8.6.1532",
+          "Unity.NSL.SocketCore": "2024.8.6.1532"
         },
         "runtime": {
           "lib/netstandard2.1/Unity.NSL.Extensions.Session.dll": {
-            "assemblyVersion": "2024.6.18.1240",
-            "fileVersion": "2024.6.18.1240"
+            "assemblyVersion": "2024.8.6.1532",
+            "fileVersion": "2024.8.6.1532"
           }
         }
       },
-      "Unity.NSL.Generators.BinaryTypeIOGenerator/2024.6.18.1240": {
+      "Unity.NSL.Generators.BinaryTypeIOGenerator/2024.8.6.1532": {
         "runtime": {
           "lib/netstandard2.0/Unity.NSL.Generators.BinaryTypeIOGenerator.dll": {
-            "assemblyVersion": "2024.6.18.1240",
-            "fileVersion": "2024.6.18.1240"
+            "assemblyVersion": "2024.8.6.1532",
+            "fileVersion": "2024.8.6.1532"
           }
         }
       },
-      "Unity.NSL.Generators.BinaryTypeIOGenerator.Attributes/2024.6.18.1240": {
+      "Unity.NSL.Generators.BinaryTypeIOGenerator.Attributes/2024.8.6.1532": {
         "runtime": {
           "lib/netstandard2.0/Unity.NSL.Generators.BinaryTypeIOGenerator.Attributes.dll": {
-            "assemblyVersion": "2024.6.18.1240",
-            "fileVersion": "2024.6.18.1240"
+            "assemblyVersion": "2024.8.6.1532",
+            "fileVersion": "2024.8.6.1532"
           }
         }
       },
-      "Unity.NSL.SocketCore/2024.6.18.1240": {
+      "Unity.NSL.SocketCore/2024.8.6.1532": {
+        "dependencies": {
+          "Unity.NSL.Utils": "2024.8.6.1532"
+        },
         "runtime": {
           "lib/netstandard2.0/Unity.NSL.SocketCore.dll": {
-            "assemblyVersion": "2024.6.18.1240",
-            "fileVersion": "2024.6.18.1240"
+            "assemblyVersion": "2024.8.6.1532",
+            "fileVersion": "2024.8.6.1532"
           }
         }
       },
-      "Unity.NSL.SocketServer/2024.6.18.1240": {
+      "Unity.NSL.SocketServer/2024.8.6.1532": {
         "dependencies": {
-          "Unity.NSL.EndPointBuilder": "2024.6.18.1240",
-          "Unity.NSL.SocketCore": "2024.6.18.1240"
+          "Unity.NSL.EndPointBuilder": "2024.8.6.1532",
+          "Unity.NSL.SocketCore": "2024.8.6.1532"
         },
         "runtime": {
           "lib/netstandard2.0/Unity.NSL.SocketServer.dll": {
-            "assemblyVersion": "2024.6.18.1240",
-            "fileVersion": "2024.6.18.1240"
+            "assemblyVersion": "2024.8.6.1532",
+            "fileVersion": "2024.8.6.1532"
           }
         }
       },
-      "Unity.NSL.UDP/2024.6.18.1240": {
+      "Unity.NSL.UDP/2024.8.6.1532": {
         "dependencies": {
           "STUN": "0.5.0",
           "System.Runtime.CompilerServices.Unsafe": "6.0.0",
-          "Unity.NSL.SocketCore": "2024.6.18.1240",
-          "Unity.NSL.SocketServer": "2024.6.18.1240"
+          "Unity.NSL.SocketCore": "2024.8.6.1532",
+          "Unity.NSL.SocketServer": "2024.8.6.1532"
         },
         "runtime": {
           "lib/netstandard2.1/Unity.NSL.UDP.dll": {
-            "assemblyVersion": "2024.6.18.1240",
-            "fileVersion": "2024.6.18.1240"
+            "assemblyVersion": "2024.8.6.1532",
+            "fileVersion": "2024.8.6.1532"
+          }
+        }
+      },
+      "Unity.NSL.Utils/2024.8.6.1532": {
+        "dependencies": {
+          "Newtonsoft.Json": "13.0.3"
+        },
+        "runtime": {
+          "lib/netstandard2.0/Unity.NSL.Utils.dll": {
+            "assemblyVersion": "2024.8.6.1532",
+            "fileVersion": "2024.8.6.1532"
           }
         }
       }
     }
   },
   "libraries": {
-    "Unity.NSL.Node.Core/2024.08.01.1143": {
+    "Unity.NSL.Node.Core/2024.08.08.1551": {
       "type": "project",
       "serviceable": false,
       "sha512": ""
+    },
+    "Newtonsoft.Json/13.0.3": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-HrC5BXdl00IP9zeV+0Z848QWPAoCr9P3bDEZguI+gkLcBKAOxix/tLEAAHC+UvDNPv4a2d18lOReHMOagPa+zQ==",
+      "path": "newtonsoft.json/13.0.3",
+      "hashPath": "newtonsoft.json.13.0.3.nupkg.sha512"
     },
     "STUN/0.5.0": {
       "type": "package",
@@ -130,54 +159,61 @@
       "path": "system.runtime.compilerservices.unsafe/6.0.0",
       "hashPath": "system.runtime.compilerservices.unsafe.6.0.0.nupkg.sha512"
     },
-    "Unity.NSL.EndPointBuilder/2024.6.18.1240": {
+    "Unity.NSL.EndPointBuilder/2024.8.6.1532": {
       "type": "package",
       "serviceable": true,
-      "sha512": "sha512-3Wc16bA352b5IGOnYkwG/Lned/Y8WkamhPF+hEAX6QWXGm7S3++4C4vUSABMkM+795EnhOmjmSAd0aGkEcIj8A==",
-      "path": "unity.nsl.endpointbuilder/2024.6.18.1240",
-      "hashPath": "unity.nsl.endpointbuilder.2024.6.18.1240.nupkg.sha512"
+      "sha512": "sha512-O/GP+0PxnF9juHz5LL0xgtpQx8KdgVY+1lfxQyq6NEWdnQAvMiDg/hkPEISGQc6BLZDRknfFbB/0k5LTRQKxRw==",
+      "path": "unity.nsl.endpointbuilder/2024.8.6.1532",
+      "hashPath": "unity.nsl.endpointbuilder.2024.8.6.1532.nupkg.sha512"
     },
-    "Unity.NSL.Extensions.Session/2024.6.18.1240": {
+    "Unity.NSL.Extensions.Session/2024.8.6.1532": {
       "type": "package",
       "serviceable": true,
-      "sha512": "sha512-07Efftu5KP3KhPvQpH6YeRXWDPC4OJ6f6of7rxkmszM/m3Viv1BBxWxgQtyiqvUVmq0XkQZVADxhFRT3XRCz4Q==",
-      "path": "unity.nsl.extensions.session/2024.6.18.1240",
-      "hashPath": "unity.nsl.extensions.session.2024.6.18.1240.nupkg.sha512"
+      "sha512": "sha512-mwjnZ98KiVxoMna9Uun0MaTgkGG+MZ3fZ6q7FLN9FWunlor0x0fRe+LVg4WGvhzc51XxFra6dXJ27oIymrIPzw==",
+      "path": "unity.nsl.extensions.session/2024.8.6.1532",
+      "hashPath": "unity.nsl.extensions.session.2024.8.6.1532.nupkg.sha512"
     },
-    "Unity.NSL.Generators.BinaryTypeIOGenerator/2024.6.18.1240": {
+    "Unity.NSL.Generators.BinaryTypeIOGenerator/2024.8.6.1532": {
       "type": "package",
       "serviceable": true,
-      "sha512": "sha512-qdtlDDUINuJDYz389MEGblcSh1Zb49zVRuwSYJQaJmldcp+5dlaaQyvNuMOiaq9LJv3HiRlGNu2EhfJX4o/N8A==",
-      "path": "unity.nsl.generators.binarytypeiogenerator/2024.6.18.1240",
-      "hashPath": "unity.nsl.generators.binarytypeiogenerator.2024.6.18.1240.nupkg.sha512"
+      "sha512": "sha512-DRCJf9Oc4X6uMsSB3WN4lCmB3i69VM8EjFR2maf9Zc9YddIEYu4eejvGDGT49JjaBEbvHYd5OEGsKwaL/fId7A==",
+      "path": "unity.nsl.generators.binarytypeiogenerator/2024.8.6.1532",
+      "hashPath": "unity.nsl.generators.binarytypeiogenerator.2024.8.6.1532.nupkg.sha512"
     },
-    "Unity.NSL.Generators.BinaryTypeIOGenerator.Attributes/2024.6.18.1240": {
+    "Unity.NSL.Generators.BinaryTypeIOGenerator.Attributes/2024.8.6.1532": {
       "type": "package",
       "serviceable": true,
-      "sha512": "sha512-4I4gFIiAfqCLI6T9xL+szaY1uIzBZ06Se6CQpvYLutwemyK0bsLW+FrytepHqp6VSat/imWjaypgkHzvfiYprA==",
-      "path": "unity.nsl.generators.binarytypeiogenerator.attributes/2024.6.18.1240",
-      "hashPath": "unity.nsl.generators.binarytypeiogenerator.attributes.2024.6.18.1240.nupkg.sha512"
+      "sha512": "sha512-qPVC6aiP62Es+6hXXPldJmRWckfD9lXVrRL3K1tUwLhaiqzUA+Xh8Qj9As+uh0Q342MMu1YSQQAwpz8/45z5jg==",
+      "path": "unity.nsl.generators.binarytypeiogenerator.attributes/2024.8.6.1532",
+      "hashPath": "unity.nsl.generators.binarytypeiogenerator.attributes.2024.8.6.1532.nupkg.sha512"
     },
-    "Unity.NSL.SocketCore/2024.6.18.1240": {
+    "Unity.NSL.SocketCore/2024.8.6.1532": {
       "type": "package",
       "serviceable": true,
-      "sha512": "sha512-+O70Y2mVeujy5H7E3s1Jl1HLEYXmKG3j4qeFCYiOdYUD8r8a3xsYKnguTf8bGDBeR6SB+y9YXRL6WTf2aqaX8Q==",
-      "path": "unity.nsl.socketcore/2024.6.18.1240",
-      "hashPath": "unity.nsl.socketcore.2024.6.18.1240.nupkg.sha512"
+      "sha512": "sha512-yNmyO67Fqa7ljHu127jvLegvEPHL7EkRQcKvSlgdkZO9kmjm9Qxb213w4tC9/eQcVfz5e2oREnDdcJC2j9XEoQ==",
+      "path": "unity.nsl.socketcore/2024.8.6.1532",
+      "hashPath": "unity.nsl.socketcore.2024.8.6.1532.nupkg.sha512"
     },
-    "Unity.NSL.SocketServer/2024.6.18.1240": {
+    "Unity.NSL.SocketServer/2024.8.6.1532": {
       "type": "package",
       "serviceable": true,
-      "sha512": "sha512-yrrKh+i4Mj0iAumGtuQuGiH5IXVCuHDHwXf/9TBPQTmvqEYItnlFDuI1VHjisVEFH3w4+iYxjM6kSImc2wR2hA==",
-      "path": "unity.nsl.socketserver/2024.6.18.1240",
-      "hashPath": "unity.nsl.socketserver.2024.6.18.1240.nupkg.sha512"
+      "sha512": "sha512-nCBOCgcChw+tjpMmzMHRovueJW54zwdmXUZONAzXUuNAbnTt/p3y5EK+iz0mX0NEMWI6gT0RU9IsYcJNBoZDUw==",
+      "path": "unity.nsl.socketserver/2024.8.6.1532",
+      "hashPath": "unity.nsl.socketserver.2024.8.6.1532.nupkg.sha512"
     },
-    "Unity.NSL.UDP/2024.6.18.1240": {
+    "Unity.NSL.UDP/2024.8.6.1532": {
       "type": "package",
       "serviceable": true,
-      "sha512": "sha512-AborPFJX91EC0ODByvEuiv7JK5AR73TUxkC1B5iu0fiD5l+xNCVGX12e2S0jvaj1jl2wereBtOkC894zxVw7Ng==",
-      "path": "unity.nsl.udp/2024.6.18.1240",
-      "hashPath": "unity.nsl.udp.2024.6.18.1240.nupkg.sha512"
+      "sha512": "sha512-jZMOtfuQdUmBUKFHW2us3SQh6ytpfAMNGvwzthE2NI7euS8cL09VZGDAG5Bhsp/qKl3H6cq+Xh4slqX0HeVRaA==",
+      "path": "unity.nsl.udp/2024.8.6.1532",
+      "hashPath": "unity.nsl.udp.2024.8.6.1532.nupkg.sha512"
+    },
+    "Unity.NSL.Utils/2024.8.6.1532": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-4s06/AcU7N7p7WF+fCGxmRk2UI6Ov3gAwQMjYPN4w7BnV4SuXrdxYjsl5ywoO9FjyOdpuH8Fmg/qoS5yJmPg7g==",
+      "path": "unity.nsl.utils/2024.8.6.1532",
+      "hashPath": "unity.nsl.utils.2024.8.6.1532.nupkg.sha512"
     }
   }
 }

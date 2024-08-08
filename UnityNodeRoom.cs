@@ -18,11 +18,6 @@ public abstract class UnityNodeRoom : UnityEngine.MonoBehaviour, IDisposable
     /// </summary>
     public int MaxNodesWaitCycle = 10;
 
-    /// <summary>
-    /// Receive transport servers from bridge server delay before continue
-    /// </summary>
-    public int WaitBridgeDelayMS = 10_000;
-
     public bool DebugPacketIO = true;
 
     public UnityNodeNetwork NodeNetwork { get; } = new UnityNodeNetwork();
@@ -37,7 +32,6 @@ public abstract class UnityNodeRoom : UnityEngine.MonoBehaviour, IDisposable
 
         NodeNetwork.TransportMode = TransportMode;
         NodeNetwork.MaxNodesWaitCycle = MaxNodesWaitCycle;
-        NodeNetwork.WaitBridgeDelayMS = WaitBridgeDelayMS;
         NodeNetwork.DebugPacketIO = DebugPacketIO;
 
         await NodeNetwork.InitializeAsync(startupInfo, cancellationToken);

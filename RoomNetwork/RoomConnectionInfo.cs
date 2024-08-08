@@ -18,4 +18,9 @@ public class RoomConnectionInfo
     public NSLSessionInfo SessionInfo { get; set; }
 
     public DateTime? DisconnectTime { get; set; }
+
+    public Guid TempId { get; } = Guid.NewGuid();
+
+    public override string ToString()
+        => $"{SessionId}~{Url}~{TempId}";
 }

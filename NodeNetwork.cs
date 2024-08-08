@@ -16,6 +16,7 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
+using UnityEngine;
 using static NSL.Node.RoomServer.Shared.Client.Core.IRoomInfo;
 
 public class NodeNetwork : IRoomInfo, INodeNetwork, IDisposable
@@ -56,11 +57,6 @@ public class NodeNetwork : IRoomInfo, INodeNetwork, IDisposable
     /// </summary>
     public int MaxNodesWaitCycle { get; set; } = 10;
 
-    /// <summary>
-    /// Receive transport servers from bridge server delay before continue
-    /// </summary>
-    public int WaitBridgeDelayMS { get; set; } = 10_000;
-
     public bool DebugPacketIO { get; set; } = true;
 
     public NodeNetworkChannelType NetworkChannelType { get; set; } = NodeNetworkChannelType.TCP;
@@ -82,6 +78,8 @@ public class NodeNetwork : IRoomInfo, INodeNetwork, IDisposable
 
     public NodeClient LocalNode { get; private set; }
 
+    private CancellationTokenSource readyWaitToken;
+
 
     internal async void Initialize(NodeSessionStartupModel startupInfo, CancellationToken cancellationToken = default)
         => await InitializeAsync(startupInfo, cancellationToken);
@@ -92,13 +90,20 @@ public class NodeNetwork : IRoomInfo, INodeNetwork, IDisposable
 
         LocalNodeId = roomStartInfo.Token.Split(':').First();
 
+        readyWaitToken = new CancellationTokenSource();
+
+        //Debug.LogError($"{nameof(InitializeAsync)} - {LocalNodeId} - {string.Join(",", startupInfo.ConnectionEndPoints.Select(x=>$"[{x.Key} - {x.Value}]").ToArray())}");
+
         try
         {
             await initUDPBindingPoint(cancellationToken);
 
             await initRooms(startupInfo.ConnectionEndPoints, cancellationToken);
 
-            if (!await waitNodeConnection(cancellationToken))
+            if (!readyWaitToken.Token.IsCancellationRequested)
+                await DelayHandle(MaxNodesWaitCycle * 1000, readyWaitToken.Token, false);
+
+            if (CurrentState != NodeRoomStateEnum.Ready)
                 ChangeState(NodeRoomStateEnum.Invalid);
         }
         catch (TaskCanceledException)
@@ -177,7 +182,7 @@ public class NodeNetwork : IRoomInfo, INodeNetwork, IDisposable
     private void ChangeState(NodeRoomStateEnum state)
     {
 #if DEBUG
-        LogHandle(LoggerLevel.Debug, $"{nameof(NodeNetwork)} change state -> {state}");
+        LogHandle(LoggerLevel.Debug, $"{nameof(NodeNetwork)}({roomStartInfo}) change state -> {state}");
 #endif
 
         CurrentState = state;
@@ -186,8 +191,16 @@ public class NodeNetwork : IRoomInfo, INodeNetwork, IDisposable
 
         OnChangeRoomState(state);
 
+        if (state == NodeRoomStateEnum.Invalid)
+        {
+            LogHandle(LoggerLevel.Error, $"Set invalid state for {roomStartInfo}");
+        }
+
         if (state == NodeRoomStateEnum.Ready)
+        {
+            readyWaitToken.Cancel();
             Invoke(() => OnRoomReady());
+        }
     }
 
     #region Room
@@ -281,29 +294,6 @@ public class NodeNetwork : IRoomInfo, INodeNetwork, IDisposable
     }
 
     #endregion
-
-    private async Task<bool> waitNodeConnection(CancellationToken cancellationToken)
-    {
-        if (roomClient == null)
-            return false;
-
-        ChangeState(NodeRoomStateEnum.WaitConnections);
-
-        bool valid = false;
-        int i = 0;
-        do
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            valid = await roomClient?.SendReady(TotalNodeCount, connectedClients.Select(x => x.Key)) == true;
-
-            if (valid == false)
-                await DelayHandle(2_000, cancellationToken: cancellationToken);
-
-        } while (!valid && roomClient != null && roomClient.AnyServers() && ++i < 10); // i for prevent locking
-
-        return roomClient?.AnySignedServers() == true;
-    }
 
     #region Transport
 
