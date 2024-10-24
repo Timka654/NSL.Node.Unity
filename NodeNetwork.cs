@@ -526,7 +526,8 @@ public class NodeNetwork : IRoomInfo, INodeNetwork, IDisposable
 
     public void SendToServer(OutputPacketBuffer packet, bool disposeOnSend = true)
     {
-        roomClient.SendToServers(packet);
+        var rc = roomClient;
+        rc?.SendToServers(packet);
 
         if (disposeOnSend)
             packet.Dispose();
@@ -630,6 +631,7 @@ public class NodeNetwork : IRoomInfo, INodeNetwork, IDisposable
 
     public void Dispose()
     {
+        LogHandle(LoggerLevel.Info, $"Dispose {roomStartInfo}");
         if (RoomSession != null && RoomSession is IDisposable d)
             d.Dispose();
 

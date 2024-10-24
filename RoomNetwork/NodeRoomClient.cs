@@ -189,7 +189,7 @@ public abstract class NodeRoomClient : IDisposable
             if(data != null)
                 result = RoomNodeSignInResponseModel.ReadFullFrom(data);
             else
-                logHandle(LoggerLevel.Error, $"Sign in response return null!!");
+                logHandle(LoggerLevel.Error, $"Sign in response return null for token {roomStartInfo}!!");
 
             result ??= new RoomNodeSignInResponseModel();
 

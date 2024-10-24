@@ -25,11 +25,19 @@ public class NodeTCPRoomClient : NodeRoomClient
     {
     }
 
-    protected override Task<bool> ConnectAsync(IClient client, int connectionTimeout)
+    protected override async Task<bool> ConnectAsync(IClient client, int connectionTimeout)
     {
         var c = client as TCPNetworkClient<RoomNetworkClient, ClientOptions<RoomNetworkClient>>;
-        
-        return c.ConnectAsync(connectionTimeout);
+
+
+        logHandle(LoggerLevel.Info, $"[Room Server]({roomStartInfo}) - Try connect");
+
+        var result = await c.ConnectAsync(connectionTimeout);
+
+
+        logHandle(LoggerLevel.Info, $"[Room Server]({roomStartInfo}) - Try connect = {result}");
+
+        return result;
     }
 
     protected override RoomConnectionInfo createConnection(string url, Guid sessionId)
@@ -65,6 +73,8 @@ public class NodeTCPRoomClient : NodeRoomClient
 
                         builder.AddConnectHandle(client =>
                         {
+                            logHandle(LoggerLevel.Info, $"[Room Server]({roomStartInfo}) - Success connected");
+
                             client.IsSigned = false;
 
                             client.ServerUrl = url;
@@ -91,11 +101,6 @@ public class NodeTCPRoomClient : NodeRoomClient
                                 return;
 
                             logHandle(LoggerLevel.Error, $"[Room Server]({roomStartInfo}) - {ex.ToString()}");
-                        });
-
-                        builder.AddDisconnectHandle(client =>
-                        {
-                            logHandle(LoggerLevel.Info, $"[Room Server]AddDisconnectHandle - Disconnect handle ({roomStartInfo})");
                         });
 
                         builder.AddDisconnectAsyncHandle(async client =>
