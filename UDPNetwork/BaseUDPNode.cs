@@ -28,7 +28,7 @@ public class BaseUDPNode
         INodeNetworkOptions node,
         Action<NSLEndPoint> getEndPoint,
         NodeLogDelegate logHandle,
-        Action<Guid, InputPacketBuffer> transportHandle)
+        Action<string, InputPacketBuffer> transportHandle)
     {
         var endPoint = UDPServerEndPointBuilder
             .Create()
@@ -76,7 +76,7 @@ public class BaseUDPNode
 
                 builder.AddPacketHandle(RoomPacketEnum.BroadcastMessage, (client, data) =>
                 {
-                    var nid = data.ReadGuid(); // from node
+                    var nid = data.ReadString(); // from node
 
                     transportHandle(nid, data);
                 });
@@ -85,7 +85,7 @@ public class BaseUDPNode
                 {
                     data.ReadGuid(); // local node
 
-                    var nid = data.ReadGuid(); // from node
+                    var nid = data.ReadString(); // from node
 
                     transportHandle(nid, data);
                 });

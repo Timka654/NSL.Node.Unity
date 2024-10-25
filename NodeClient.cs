@@ -17,7 +17,7 @@ public class NodeClient : INetworkClient, INodeClientNetwork
 
     public string Token => connectionInfo.Token;
 
-    public Guid NodeId => connectionInfo.NodeId;
+    public string NodeId => connectionInfo.NodeId;
 
     public bool IsLocalNode => NodeNetwork.LocalNodeId == NodeId;
 
@@ -123,7 +123,7 @@ public class NodeClient : INetworkClient, INodeClientNetwork
     {
         var packet = new DgramOutputPacketBuffer();
 
-        packet.WriteGuid(NodeNetwork.LocalNodeId);
+        packet.WriteString(NodeNetwork.LocalNodeId);
 
         build(packet);
 
@@ -156,9 +156,9 @@ public class NodeClient : INetworkClient, INodeClientNetwork
 
         var packet = new DgramOutputPacketBuffer();
 
-        packet.WriteGuid(NodeId);
+        packet.WriteString(NodeId);
 
-        packet.WriteGuid(NodeNetwork.LocalNodeId);
+        packet.WriteString(NodeNetwork.LocalNodeId);
 
         build(packet);
 
@@ -183,9 +183,9 @@ public class NodeClient : INetworkClient, INodeClientNetwork
 
         var packet = new DgramOutputPacketBuffer();
 
-        packet.WriteGuid(NodeId);
+        packet.WriteString(NodeId);
 
-        packet.WriteGuid(NodeNetwork.LocalNodeId);
+        packet.WriteString(NodeNetwork.LocalNodeId);
 
         build(packet);
 

@@ -13,15 +13,9 @@ public abstract class UnityNodeRoom : UnityEngine.MonoBehaviour, IDisposable
     public NodeTransportModeEnum TransportMode = NodeTransportModeEnum.ProxyOnly;
 
     /// <summary>
-    /// 1 unit = 1 second
-    /// for no wait connections set this value to default = 0
+    /// default = 30 000 ms
     /// </summary>
-    public int MaxNodesWaitCycle = 10;
-
-    /// <summary>
-    /// Receive transport servers from bridge server delay before continue
-    /// </summary>
-    public int WaitBridgeDelayMS = 10_000;
+    public int MaxReadyWaitDelay = 30_000;
 
     public bool DebugPacketIO = true;
 
@@ -36,17 +30,16 @@ public abstract class UnityNodeRoom : UnityEngine.MonoBehaviour, IDisposable
             cancellationToken = (cts = new CancellationTokenSource()).Token;
 
         NodeNetwork.TransportMode = TransportMode;
-        NodeNetwork.MaxNodesWaitCycle = MaxNodesWaitCycle;
-        NodeNetwork.WaitBridgeDelayMS = WaitBridgeDelayMS;
+        NodeNetwork.MaxReadyWaitDelay = MaxReadyWaitDelay;
         NodeNetwork.DebugPacketIO = DebugPacketIO;
 
         await NodeNetwork.InitializeAsync(startupInfo, cancellationToken);
     }
 
-    public void FillOwner(GameObject obj, Guid nodeId)
+    public void FillOwner(GameObject obj, string nodeId)
         => NodeNetwork.FillOwner(obj, nodeId);
 
-    public void SetOwner(UnityNodeBehaviour obj, Guid nodeId)
+    public void SetOwner(UnityNodeBehaviour obj, string nodeId)
         => NodeNetwork.SetOwner(obj, nodeId);
 
 

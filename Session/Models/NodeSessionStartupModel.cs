@@ -21,4 +21,9 @@ public class NodeSessionStartupModel
 
         ConnectionEndPoints = buffer.ReadCollection(() => (buffer.ReadString(), buffer.ReadGuid())).ToDictionary(x => x.Item1, x => x.Item2);
     }
+
+    public override string ToString()
+    {
+        return $"{Token}~{RoomId}";
+    }
 }

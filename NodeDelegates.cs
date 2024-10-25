@@ -18,15 +18,15 @@ public delegate void NodeLogDelegate(LoggerLevel level, string content);
 
 public delegate void OnNodeRoomExecuteDelegate(InputPacketBuffer buffer);
 
-public delegate void OnNodeRoomTransportDelegate(Guid nodeId, InputPacketBuffer buffer);
+public delegate void OnNodeRoomTransportDelegate(string nodeId, InputPacketBuffer buffer);
 
 public delegate void OnNodeRoomSignReceiveDelegate(RoomNetworkClient room,RoomNodeSignInResponseModel response);
 
-public delegate void OnRoomNodeDisconnectDelegate(Guid nodeId);
+public delegate void OnRoomNodeDisconnectDelegate(string nodeId);
 
-public delegate void OnRoomNodeConnectionLostDelegate(Guid nodeId);
+public delegate void OnRoomNodeConnectionLostDelegate(string nodeId);
 
-public delegate void OnRoomChangeNodeEndPointDelegate(Guid nodeId, string endPoint);
+public delegate void OnRoomChangeNodeEndPointDelegate(string nodeId, string endPoint);
 
 public delegate void OnRoomDestroyDelegate();
 

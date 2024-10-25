@@ -16,18 +16,20 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
+using UnityEngine;
+using static NSL.Node.RoomServer.Shared.Client.Core.IRoomInfo;
 
 public class NodeNetwork : IRoomInfo, INodeNetwork, IDisposable
 {
     public NodeRoomClient roomClient;
 
-    public event Action<NodeInfo> OnNodeConnect = node => { };
+    public event OnNodeDelegate OnNodeConnect = node => Task.CompletedTask;
 
-    public event Action<NodeInfo> OnNodeConnectionLost = node => { };
+    public event OnNodeDelegate OnNodeConnectionLost = node => Task.CompletedTask;
 
-    public event IRoomInfo.OnNodeDisconnectDelegate OnNodeDisconnect = (node, manualDisconnected) => { };
+    public event IRoomInfo.OnNodeDisconnectDelegate OnNodeDisconnect = (node, manualDisconnected) => Task.CompletedTask;
 
-    public event Action OnRoomReady = () => { };
+    public event Func<Task> OnRoomReady = () => Task.CompletedTask;
 
     public int TotalNodeCount { get; private set; }
 
@@ -41,7 +43,7 @@ public class NodeNetwork : IRoomInfo, INodeNetwork, IDisposable
 
     public NSLSessionInfo Session { get; private set; }
 
-    private ConcurrentDictionary<Guid, NodeClient> connectedClients = new ConcurrentDictionary<Guid, NodeClient>();
+    private ConcurrentDictionary<string, NodeClient> connectedClients = new ConcurrentDictionary<string, NodeClient>();
 
     /// <summary>
     /// Can set how transport all data - P2P, Proxy, All
@@ -50,24 +52,20 @@ public class NodeNetwork : IRoomInfo, INodeNetwork, IDisposable
     public NodeTransportModeEnum TransportMode { get; set; } = NodeTransportModeEnum.ProxyOnly;
 
     /// <summary>
-    /// 1 unit = 1 second
-    /// for no wait connections set this value to default = 0
+    /// default = 30 000 ms
     /// </summary>
-    public int MaxNodesWaitCycle { get; set; } = 10;
-
-    /// <summary>
-    /// Receive transport servers from bridge server delay before continue
-    /// </summary>
-    public int WaitBridgeDelayMS { get; set; } = 10_000;
+    public int MaxReadyWaitDelay { get; set; } = 30000;
 
     public bool DebugPacketIO { get; set; } = true;
+
+    public NodeNetworkChannelType NetworkChannelType { get; set; } = NodeNetworkChannelType.TCP;
 
     public event OnChangeRoomStateDelegate OnChangeRoomState = state =>
     {
     };
 
     public event OnChangeNodesReadyDelegate OnChangeNodesReady = (current, total) => { };
-    public event Action<NodeInfo> OnRecoverySession;
+    public event OnNodeDelegate OnRecoverySession = node => Task.CompletedTask;
 
     public NodeRoomStateEnum CurrentState { get; private set; }
 
@@ -75,9 +73,12 @@ public class NodeNetwork : IRoomInfo, INodeNetwork, IDisposable
 
     public IRoomSession RoomSession { get; private set; }
 
-    public Guid LocalNodeId { get; private set; }
+    public string LocalNodeId { get; private set; }
 
     public NodeClient LocalNode { get; private set; }
+
+    private CancellationTokenSource readyWaitToken;
+
 
     internal async void Initialize(NodeSessionStartupModel startupInfo, CancellationToken cancellationToken = default)
         => await InitializeAsync(startupInfo, cancellationToken);
@@ -86,7 +87,11 @@ public class NodeNetwork : IRoomInfo, INodeNetwork, IDisposable
     {
         roomStartInfo = startupInfo;
 
-        LocalNodeId = Guid.Parse(roomStartInfo.Token.Split(':').First());
+        LocalNodeId = roomStartInfo.Token.Split(':').First();
+
+        readyWaitToken = new CancellationTokenSource();
+
+        //Debug.LogError($"{nameof(InitializeAsync)} - {LocalNodeId} - {string.Join(",", startupInfo.ConnectionEndPoints.Select(x=>$"[{x.Key} - {x.Value}]").ToArray())}");
 
         try
         {
@@ -94,7 +99,10 @@ public class NodeNetwork : IRoomInfo, INodeNetwork, IDisposable
 
             await initRooms(startupInfo.ConnectionEndPoints, cancellationToken);
 
-            if (!await waitNodeConnection(cancellationToken))
+            if (!readyWaitToken.Token.IsCancellationRequested)
+                await DelayHandle(MaxReadyWaitDelay, readyWaitToken.Token, false);
+
+            if (CurrentState != NodeRoomStateEnum.Ready)
                 ChangeState(NodeRoomStateEnum.Invalid);
         }
         catch (TaskCanceledException)
@@ -173,7 +181,7 @@ public class NodeNetwork : IRoomInfo, INodeNetwork, IDisposable
     private void ChangeState(NodeRoomStateEnum state)
     {
 #if DEBUG
-        LogHandle(LoggerLevel.Debug, $"{nameof(NodeNetwork)} change state -> {state}");
+        LogHandle(LoggerLevel.Debug, $"{nameof(NodeNetwork)}({roomStartInfo}) change state -> {state}");
 #endif
 
         CurrentState = state;
@@ -182,8 +190,16 @@ public class NodeNetwork : IRoomInfo, INodeNetwork, IDisposable
 
         OnChangeRoomState(state);
 
+        if (state == NodeRoomStateEnum.Invalid)
+        {
+            LogHandle(LoggerLevel.Error, $"Set invalid state for {roomStartInfo}");
+        }
+
         if (state == NodeRoomStateEnum.Ready)
+        {
+            readyWaitToken.Cancel();
             Invoke(() => OnRoomReady());
+        }
     }
 
     #region Room
@@ -194,14 +210,34 @@ public class NodeNetwork : IRoomInfo, INodeNetwork, IDisposable
 
         ChangeState(NodeRoomStateEnum.ConnectionTransportServers);
 
-        roomClient = new NodeRoomClient(
-            this,
-            LogHandle,
-            ChangeState,
-            roomStartInfo,
-            connectionPoints,
-            udpEndPointConnectionUrl,
-            () => OnNodeDisconnect(LocalNode?.NodeInfo, false));
+        if (connectionPoints.All(x => x.Key.StartsWith("ws")))
+            NetworkChannelType = NodeNetworkChannelType.WS;
+        else if (connectionPoints.All(x => x.Key.StartsWith("tcp")))
+            NetworkChannelType = NodeNetworkChannelType.TCP;
+
+        roomClient = NetworkChannelType switch
+        {
+            NodeNetworkChannelType.WS => new NodeWSRoomClient(
+                                                               this,
+                                                               LogHandle,
+                                                               ChangeState,
+                                                               roomStartInfo,
+                                                               connectionPoints,
+                                                               udpEndPointConnectionUrl,
+                                                               DelayHandle,
+                                                               () => OnNodeDisconnect(LocalNode?.NodeInfo, false),
+                                                               () => OnRecoverySession(LocalNode?.NodeInfo)),
+            NodeNetworkChannelType.TCP => new NodeTCPRoomClient(
+                                                               this,
+                                                               LogHandle,
+                                                               ChangeState,
+                                                               roomStartInfo,
+                                                               connectionPoints,
+                                                               udpEndPointConnectionUrl,
+                                                               DelayHandle,
+                                                               () => OnNodeDisconnect(LocalNode?.NodeInfo, false),
+                                                               () => OnRecoverySession(LocalNode?.NodeInfo)),
+        };
 
         roomClient.OnExecute += roomClient_OnExecute;
 
@@ -248,7 +284,7 @@ public class NodeNetwork : IRoomInfo, INodeNetwork, IDisposable
         Invoke((NodeInfo)null, buffer);
     }
 
-    private void roomClient_OnTransport(Guid nodeId, InputPacketBuffer buffer)
+    private void roomClient_OnTransport(string nodeId, InputPacketBuffer buffer)
     {
         if (!connectedClients.TryGetValue(nodeId, out var client))
             return;
@@ -257,29 +293,6 @@ public class NodeNetwork : IRoomInfo, INodeNetwork, IDisposable
     }
 
     #endregion
-
-    private async Task<bool> waitNodeConnection(CancellationToken cancellationToken)
-    {
-        if (roomClient == null)
-            return false;
-
-        ChangeState(NodeRoomStateEnum.WaitConnections);
-
-        bool valid = false;
-        int i = 0;
-        do
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            valid = await roomClient?.SendReady(TotalNodeCount, connectedClients.Select(x => x.Key), DelayHandle) == true;
-
-            if (valid == false)
-                await DelayHandle(2_000, cancellationToken: cancellationToken);
-
-        } while (!valid && roomClient != null && roomClient.AnyServers() && ++i < 10); // i for prevent locking
-
-        return roomClient?.AnySignedServers() == true;
-    }
 
     #region Transport
 
@@ -346,7 +359,7 @@ public class NodeNetwork : IRoomInfo, INodeNetwork, IDisposable
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public bool SendTo(Guid nodeId, DgramOutputPacketBuffer packet, bool disposeOnSend = true)
+    public bool SendTo(string nodeId, DgramOutputPacketBuffer packet, bool disposeOnSend = true)
     {
         if (connectedClients.TryGetValue(nodeId, out var node))
             return SendTo(node.NodeInfo, packet, disposeOnSend);
@@ -357,7 +370,7 @@ public class NodeNetwork : IRoomInfo, INodeNetwork, IDisposable
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public bool SendTo(Guid nodeId, UDPChannelEnum channel, DgramOutputPacketBuffer packet, bool disposeOnSend = true)
+    public bool SendTo(string nodeId, UDPChannelEnum channel, DgramOutputPacketBuffer packet, bool disposeOnSend = true)
     {
         if (connectedClients.TryGetValue(nodeId, out var node))
             return SendTo(node.NodeInfo, channel, packet, disposeOnSend);
@@ -381,6 +394,20 @@ public class NodeNetwork : IRoomInfo, INodeNetwork, IDisposable
         node.Network.Send(packet, channel, disposeOnSend);
 
         return true;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public bool SendTo(NodeInfo node, byte[] buffer)
+    {
+        //node.Network.Send(buffer);
+
+        return false;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public bool SendTo(NodeInfo node, byte[] buffer, int offset, int len)
+    {
+        return false;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -428,7 +455,7 @@ public class NodeNetwork : IRoomInfo, INodeNetwork, IDisposable
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public bool SendTo(Guid nodeId, Action<DgramOutputPacketBuffer> builder)
+    public bool SendTo(string nodeId, Action<DgramOutputPacketBuffer> builder)
     {
         if (connectedClients.TryGetValue(nodeId, out var node))
             return SendTo(node, builder);
@@ -437,7 +464,7 @@ public class NodeNetwork : IRoomInfo, INodeNetwork, IDisposable
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public bool SendTo(Guid nodeId, UDPChannelEnum channel, Action<DgramOutputPacketBuffer> builder)
+    public bool SendTo(string nodeId, UDPChannelEnum channel, Action<DgramOutputPacketBuffer> builder)
     {
         if (connectedClients.TryGetValue(nodeId, out var node))
             return SendTo(node, channel, builder);
@@ -446,7 +473,7 @@ public class NodeNetwork : IRoomInfo, INodeNetwork, IDisposable
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public bool SendTo(Guid nodeId, ushort command, Action<DgramOutputPacketBuffer> build)
+    public bool SendTo(string nodeId, ushort command, Action<DgramOutputPacketBuffer> build)
     {
         if (connectedClients.TryGetValue(nodeId, out var node))
             return SendTo(node, command, build);
@@ -455,7 +482,7 @@ public class NodeNetwork : IRoomInfo, INodeNetwork, IDisposable
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public bool SendTo(Guid nodeId, ushort command, UDPChannelEnum channel, Action<DgramOutputPacketBuffer> build)
+    public bool SendTo(string nodeId, ushort command, UDPChannelEnum channel, Action<DgramOutputPacketBuffer> build)
     {
         if (connectedClients.TryGetValue(nodeId, out var node))
             return SendTo(node, command, channel, build);
@@ -499,7 +526,8 @@ public class NodeNetwork : IRoomInfo, INodeNetwork, IDisposable
 
     public void SendToServer(OutputPacketBuffer packet, bool disposeOnSend = true)
     {
-        roomClient.SendToServers(packet);
+        var rc = roomClient;
+        rc?.SendToServers(packet);
 
         if (disposeOnSend)
             packet.Dispose();
@@ -603,6 +631,7 @@ public class NodeNetwork : IRoomInfo, INodeNetwork, IDisposable
 
     public void Dispose()
     {
+        LogHandle(LoggerLevel.Info, $"Dispose {roomStartInfo}");
         if (RoomSession != null && RoomSession is IDisposable d)
             d.Dispose();
 
@@ -619,7 +648,7 @@ public class NodeNetwork : IRoomInfo, INodeNetwork, IDisposable
 
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public NodeInfo GetNode(Guid id)
+    public NodeInfo GetNode(string id)
     {
         if (connectedClients.TryGetValue(id, out var node))
             return node.NodeInfo;
@@ -631,8 +660,14 @@ public class NodeNetwork : IRoomInfo, INodeNetwork, IDisposable
     public IEnumerable<NodeInfo> GetNodes()
         => connectedClients.Values.Select(x => x.NodeInfo).ToArray();
 
-    public void RecoverySession(NodeInfo node)
+    public Task RecoverySession(NodeInfo node)
     {
         throw new NotImplementedException();
     }
+}
+
+public enum NodeNetworkChannelType
+{
+    WS,
+    TCP
 }
