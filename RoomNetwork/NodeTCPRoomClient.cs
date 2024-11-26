@@ -21,8 +21,11 @@ using System.Threading.Tasks;
 
 public class NodeTCPRoomClient : NodeRoomClient
 {
-    public NodeTCPRoomClient(INodeNetworkOptions node, NodeLogDelegate logHandle, OnChangeRoomStateDelegate changeStateHandle, NodeSessionStartupModel roomStartInfo, Dictionary<string, Guid> connectionPoints, string localNodeUdpEndPoint, Func<int, CancellationToken, bool, Task> delayHandle, Action onDisconnect, Action onRecoverySession) : base(node, logHandle, changeStateHandle, roomStartInfo, connectionPoints, localNodeUdpEndPoint, delayHandle, onDisconnect, onRecoverySession)
+    private readonly bool legacyThread;
+
+    public NodeTCPRoomClient(INodeNetworkOptions node, NodeLogDelegate logHandle, OnChangeRoomStateDelegate changeStateHandle, NodeSessionStartupModel roomStartInfo, Dictionary<string, Guid> connectionPoints, string localNodeUdpEndPoint, Func<int, CancellationToken, bool, Task> delayHandle, Action onDisconnect, Action onRecoverySession, bool legacyThread) : base(node, logHandle, changeStateHandle, roomStartInfo, connectionPoints, localNodeUdpEndPoint, delayHandle, onDisconnect, onRecoverySession)
     {
+        this.legacyThread = legacyThread;
     }
 
     protected override async Task<bool> ConnectAsync(IClient client, int connectionTimeout)
@@ -153,9 +156,9 @@ public class NodeTCPRoomClient : NodeRoomClient
                     .WithEndPoint(host, port)
 
 #if UNITY_WEBGL && !UNITY_EDITOR
-                .BuildForWGLPlatform()
+                    .BuildForWGLPlatform()
 #else
-                    .Build()
+                    .Build(legacyThread)
 #endif
                     ;
 
