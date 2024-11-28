@@ -60,7 +60,6 @@ public class NodeNetwork : IRoomInfo, INodeNetwork, IDisposable
 
     public NodeNetworkChannelType NetworkChannelType { get; set; } = NodeNetworkChannelType.TCP;
 
-    public bool LegacyTCPThread { get; set; } = true;
 
     public event OnChangeRoomStateDelegate OnChangeRoomState = state =>
     {
@@ -238,8 +237,7 @@ public class NodeNetwork : IRoomInfo, INodeNetwork, IDisposable
                                                                udpEndPointConnectionUrl,
                                                                DelayHandle,
                                                                () => OnNodeDisconnect(LocalNode?.NodeInfo, false),
-                                                               () => OnRecoverySession(LocalNode?.NodeInfo),
-                                                               LegacyTCPThread),
+                                                               () => OnRecoverySession(LocalNode?.NodeInfo)),
         };
 
         roomClient.OnExecute += roomClient_OnExecute;

@@ -331,9 +331,11 @@ public abstract class NodeRoomClient : IDisposable
 
         var nid = data.ReadString(); // from node
 
-        var len = (int)(data.Length - data.Position);
+        var len = (int)(data.DataLength - data.DataPosition);
 
-        var packet = new InputPacketBuffer(data.Read(len));
+        var packet = new InputPacketBuffer(data.PacketLength, data.PacketId);
+
+        packet.SetData(data.Read(len).ToArray());
 
         OnTransport(nid, packet);
     }
