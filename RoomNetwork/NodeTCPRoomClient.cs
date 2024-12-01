@@ -71,6 +71,9 @@ public class NodeTCPRoomClient : NodeRoomClient
 
                         builder.GetOptions().AddNSLSessions();
 
+                        builder.GetOptions().ReceiveBufferSize = 64 * 1024;
+                        builder.GetOptions().SegmentSize = 1024;
+
                         builder.AddConnectHandle(client =>
                         {
                             logHandle(LoggerLevel.Info, $"[Room Server]({roomStartInfo}) - Success connected");
